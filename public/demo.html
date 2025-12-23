@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TryOn Widget - Demo Page</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      background: white;
+      border-radius: 16px;
+      padding: 48px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    h1 {
+      font-size: 48px;
+      color: #111827;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    p {
+      font-size: 18px;
+      color: #6b7280;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .info-box {
+      background: #f9fafb;
+      border-left: 4px solid #667eea;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 32px 0;
+    }
+
+    .info-box h2 {
+      font-size: 20px;
+      color: #111827;
+      margin-bottom: 12px;
+    }
+
+    .info-box code {
+      background: #111827;
+      color: #10b981;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+    }
+
+    .feature-list {
+      list-style: none;
+      margin: 24px 0;
+    }
+
+    .feature-list li {
+      padding: 12px 0;
+      padding-left: 32px;
+      position: relative;
+      font-size: 16px;
+      color: #374151;
+    }
+
+    .feature-list li:before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: #10b981;
+      font-weight: bold;
+      font-size: 20px;
+    }
+
+    .cta {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 16px 32px;
+      border: none;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 24px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .cta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid #e5e7eb;
+      text-align: center;
+      color: #9ca3af;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎨 TryOn Widget Demo</h1>
+    <p>
+      Esta es una página de ejemplo que demuestra cómo integrar el widget TryOn 
+      en cualquier sitio web con una sola línea de código.
+    </p>
+
+    <div class="info-box">
+      <h2>👀 Mira abajo a la derecha</h2>
+      <p>
+        Verás un botón flotante que dice <code>✨ Try look</code>. 
+        Haz clic en él para abrir el widget y probar la funcionalidad.
+      </p>
+    </div>
+
+    <h2 style="margin-top: 32px; margin-bottom: 16px; color: #111827;">
+      ✨ Características
+    </h2>
+    <ul class="feature-list">
+      <li>Widget completamente aislado con Shadow DOM</li>
+      <li>Sin colisiones con estilos del sitio host</li>
+      <li>Carga asíncrona y no bloqueante</li>
+      <li>Drag & drop para subir imágenes</li>
+      <li>Preview instantáneo de imágenes</li>
+      <li>Onboarding para nuevos usuarios</li>
+      <li>Responsive y mobile-friendly</li>
+    </ul>
+
+    <div class="info-box" style="margin-top: 32px;">
+      <h2>🚀 Integración en tu sitio</h2>
+      <p style="margin-top: 16px; margin-bottom: 8px;">
+        Pega esta línea antes del cierre del <code>&lt;/body&gt;</code>:
+      </p>
+      <pre style="background: #111827; color: #10b981; padding: 16px; border-radius: 8px; overflow-x: auto; margin-top: 12px; font-size: 14px;"><code>&lt;script
+  src="https://tryon-backend.vercel.app/api/widget"
+  data-tryon-key="demo_key_12345"&gt;
+&lt;/script&gt;</code></pre>
+      <p style="margin-top: 12px; font-size: 14px; color: #6b7280;">
+        Reemplaza <code>demo_key_12345</code> con tu API key real.
+      </p>
+    </div>
+
+    <footer>
+      <p>
+        Powered by <strong>TryOn.com</strong> · 
+        Backend minimalista sin base de datos · 
+        Desplegado en Vercel
+      </p>
+    </footer>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- WIDGET TRYON - UNA SOLA LÍNEA -->
+  <!-- ============================================ -->
+  <script
+    src="http://localhost:3000/api/widget"
+    data-tryon-key="demo_key_12345">
+  </script>
+  <!-- ============================================ -->
+
+  <!-- 
+    Nota: En producción, cambia localhost:3000 por tu dominio:
+    src="https://tryon-backend.vercel.app/api/widget"
+  -->
+</body>
+</html>
