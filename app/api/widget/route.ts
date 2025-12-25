@@ -13,13 +13,10 @@ export async function GET(request: NextRequest) {
   try {
     // Leer el código del widget
     const widgetPath = join(process.cwd(), 'lib', 'widget-core.js');
-    let widgetCode = readFileSync(widgetPath, 'utf-8');
-
-    // Reemplazar URL del backend con la actual
-    const backendUrl = request.nextUrl.origin;
-    widgetCode = widgetCode.replace('BACKEND_URL_PLACEHOLDER', backendUrl);
+    const widgetCode = readFileSync(widgetPath, 'utf-8');
 
     // Devolver como JavaScript puro
+    // El widget detecta automáticamente la URL del backend desde script.src
     return new NextResponse(widgetCode, {
       status: 200,
       headers: {

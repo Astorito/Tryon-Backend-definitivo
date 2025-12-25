@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔍 Diagnóstico Widget TryOn</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      padding: 20px;
+      background: #f0f0f0;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 { color: #667eea; }
+    .section {
+      background: white;
+      padding: 20px;
+      margin: 15px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .check {
+      padding: 8px;
+      margin: 5px 0;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    .ok { background: #d4edda; color: #155724; }
+    .error { background: #f8d7da; color: #721c24; }
+    .warning { background: #fff3cd; color: #856404; }
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    button:hover { background: #5568d3; }
+    pre {
+      background: #f5f5f5;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 Diagnóstico del Widget TryOn</h1>
+  
+  <div class="section">
+    <h2>📊 Estado del Widget</h2>
+    <div id="status">Analizando...</div>
+    <button onclick="runDiagnostics()">🔄 Re-diagnosticar</button>
+    <button onclick="window.location.reload()">♻️ Recargar Página</button>
+  </div>
+
+  <div class="section">
+    <h2>📋 Log de Consola</h2>
+    <div id="console-log" style="max-height: 200px; overflow-y: auto;"></div>
+  </div>
+
+  <div class="section">
+    <h2>🌐 Network Check</h2>
+    <p>Verifica manualmente en DevTools (F12) → Network tab:</p>
+    <ul>
+      <li>Busca: <code>/api/widget</code></li>
+      <li>Status debe ser: <strong>200</strong></li>
+      <li>Type debe ser: <strong>script</strong> o <strong>javascript</strong></li>
+      <li>Content-Type: <strong>application/javascript</strong></li>
+    </ul>
+  </div>
+
+  <script>
+    // Capturar todos los console.log/error
+    const consoleLog = document.getElementById('console-log');
+    const originalLog = console.log;
+    const originalError = console.error;
+    const originalWarn = console.warn;
+
+    function addToLog(type, ...args) {
+      const div = document.createElement('div');
+      div.className = `check ${type}`;
+      div.textContent = `[${type.toUpperCase()}] ${args.join(' ')}`;
+      consoleLog.appendChild(div);
+      consoleLog.scrollTop = consoleLog.scrollHeight;
+    }
+
+    console.log = function(...args) {
+      originalLog.apply(console, args);
+      addToLog('log', ...args);
+    };
+
+    console.error = function(...args) {
+      originalError.apply(console, args);
+      addToLog('error', ...args);
+    };
+
+    console.warn = function(...args) {
+      originalWarn.apply(console, args);
+      addToLog('warning', ...args);
+    };
+
+    console.log('🚀 Sistema de diagnóstico iniciado');
+
+    function runDiagnostics() {
+      const statusDiv = document.getElementById('status');
+      statusDiv.innerHTML = '<h3>Ejecutando diagnóstico...</h3>';
+      
+      const checks = [];
+      
+      // Check 1: Variable global
+      const loaded = window.__TRYON_WIDGET_LOADED__;
+      checks.push({
+        name: '1. Variable global __TRYON_WIDGET_LOADED__',
+        ok: !!loaded,
+        value: loaded ? 'true' : 'undefined'
+      });
+
+      // Check 2: Root element
+      const root = document.getElementById('tryon-widget-root');
+      checks.push({
+        name: '2. Elemento #tryon-widget-root existe',
+        ok: !!root,
+        value: root ? 'Encontrado' : 'No encontrado'
+      });
+
+      // Check 3: Shadow DOM
+      const hasShadow = root && root.shadowRoot;
+      checks.push({
+        name: '3. Shadow DOM adjunto',
+        ok: !!hasShadow,
+        value: hasShadow ? 'Sí' : 'No'
+      });
+
+      // Check 4: Botón FAB
+      let fab = null;
+      if (hasShadow) {
+        fab = root.shadowRoot.querySelector('.tryon-fab');
+      }
+      checks.push({
+        name: '4. Botón flotante (.tryon-fab)',
+        ok: !!fab,
+        value: fab ? `"${fab.textContent.trim()}"` : 'No encontrado'
+      });
+
+      // Check 5: Estilo del botón
+      let fabVisible = false;
+      if (fab) {
+        const computed = window.getComputedStyle(fab);
+        fabVisible = computed.display !== 'none' && computed.visibility !== 'hidden';
+      }
+      checks.push({
+        name: '5. Botón visible (no display:none)',
+        ok: fabVisible,
+        value: fabVisible ? 'Visible' : 'Oculto o no existe'
+      });
+
+      // Check 6: Script tag del widget
+      const scripts = Array.from(document.querySelectorAll('script'));
+      const widgetScript = scripts.find(s => s.src && s.src.includes('/api/widget'));
+      checks.push({
+        name: '6. Script tag del widget',
+        ok: !!widgetScript,
+        value: widgetScript ? widgetScript.src : 'No encontrado'
+      });
+
+      // Check 7: data-tryon-key
+      const hasKey = widgetScript && widgetScript.hasAttribute('data-tryon-key');
+      checks.push({
+        name: '7. Atributo data-tryon-key',
+        ok: !!hasKey,
+        value: hasKey ? widgetScript.getAttribute('data-tryon-key') : 'No encontrado'
+      });
+
+      // Renderizar resultados
+      let html = '';
+      checks.forEach(check => {
+        html += `<div class="check ${check.ok ? 'ok' : 'error'}">
+          ${check.ok ? '✅' : '❌'} ${check.name}: <strong>${check.value}</strong>
+        </div>`;
+      });
+
+      // Resumen
+      const allOk = checks.every(c => c.ok);
+      if (allOk) {
+        html = `<div class="check ok" style="font-size: 18px;">
+          🎉 ¡WIDGET FUNCIONANDO CORRECTAMENTE!
+        </div>` + html;
+      } else {
+        const failedChecks = checks.filter(c => !c.ok);
+        html = `<div class="check error" style="font-size: 18px;">
+          ⚠️ ${failedChecks.length} problema(s) encontrado(s)
+        </div>` + html;
+      }
+
+      // Inspección del DOM
+      html += '<h3 style="margin-top: 20px;">🔍 Inspección del DOM:</h3>';
+      html += '<pre>';
+      html += `document.body.children.length: ${document.body.children.length}\n`;
+      html += `Último elemento del body: ${document.body.lastElementChild?.tagName || 'ninguno'}\n`;
+      if (root) {
+        html += `\n#tryon-widget-root encontrado\n`;
+        html += `  - shadowRoot: ${root.shadowRoot ? 'Sí' : 'No'}\n`;
+        if (root.shadowRoot) {
+          html += `  - children count: ${root.shadowRoot.children.length}\n`;
+          const fabInShadow = root.shadowRoot.querySelector('.tryon-fab');
+          if (fabInShadow) {
+            html += `  - .tryon-fab text: "${fabInShadow.textContent.trim()}"\n`;
+            html += `  - .tryon-fab display: ${getComputedStyle(fabInShadow).display}\n`;
+            html += `  - .tryon-fab position: ${getComputedStyle(fabInShadow).position}\n`;
+            html += `  - .tryon-fab bottom: ${getComputedStyle(fabInShadow).bottom}\n`;
+            html += `  - .tryon-fab right: ${getComputedStyle(fabInShadow).right}\n`;
+          }
+        }
+      }
+      html += '</pre>';
+
+      statusDiv.innerHTML = html;
+    }
+
+    // Ejecutar diagnóstico después de que cargue todo
+    console.log('⏳ Esperando 2 segundos para que el widget se inicialice...');
+    setTimeout(() => {
+      console.log('🔍 Ejecutando diagnóstico...');
+      runDiagnostics();
+    }, 2000);
+  </script>
+
+  <!-- ============================================ -->
+  <!-- WIDGET TRYON -->
+  <!-- ============================================ -->
+  <script 
+    src="/api/widget" 
+    data-tryon-key="diagnostico_12345"
+    onload="console.log('✅ Script del widget cargado')"
+    onerror="console.error('❌ Error al cargar script del widget')">
+  </script>
+  <!-- ============================================ -->
+
+</body>
+</html>

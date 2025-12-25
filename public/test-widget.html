@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test TryOn Widget</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 40px;
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 { color: #333; margin-bottom: 20px; }
+    .status {
+      padding: 15px;
+      border-radius: 4px;
+      margin: 20px 0;
+      font-family: monospace;
+    }
+    .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 10px;
+    }
+    button:hover { background: #5568d3; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧪 Test TryOn Widget</h1>
+    
+    <div id="status" class="status">
+      <strong>Estado:</strong> Inicializando...
+    </div>
+
+    <h3>Verificaciones:</h3>
+    <ul id="checks"></ul>
+
+    <button onclick="location.reload()">🔄 Recargar</button>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const checksEl = document.getElementById('checks');
+    
+    function addCheck(text, isOk) {
+      const li = document.createElement('li');
+      li.textContent = `${isOk ? '✅' : '❌'} ${text}`;
+      li.style.color = isOk ? '#155724' : '#721c24';
+      li.style.marginBottom = '8px';
+      checksEl.appendChild(li);
+    }
+
+    // Verificar carga del widget
+    setTimeout(() => {
+      const widgetLoaded = window.__TRYON_WIDGET_LOADED__;
+      const widgetRoot = document.getElementById('tryon-widget-root');
+      const hasShadowDOM = widgetRoot && widgetRoot.shadowRoot;
+      
+      addCheck('Variable global __TRYON_WIDGET_LOADED__', !!widgetLoaded);
+      addCheck('Elemento #tryon-widget-root creado', !!widgetRoot);
+      addCheck('Shadow DOM adjunto', !!hasShadowDOM);
+      
+      if (hasShadowDOM) {
+        const fab = widgetRoot.shadowRoot.querySelector('.tryon-fab');
+        addCheck('Botón flotante (.tryon-fab) visible', !!fab);
+      }
+
+      if (widgetLoaded && hasShadowDOM) {
+        statusEl.className = 'status success';
+        statusEl.innerHTML = '<strong>✅ Widget cargado correctamente!</strong>';
+      } else {
+        statusEl.className = 'status error';
+        statusEl.innerHTML = '<strong>❌ Widget no se cargó.</strong> Revisa la consola y el Network tab.';
+      }
+    }, 1000);
+  </script>
+
+  <!-- WIDGET SCRIPT - Cambia localhost:3000 por tu URL de Vercel -->
+  <script src="http://localhost:3000/api/widget" data-tryon-key="test-key-123"></script>
+</body>
+</html>

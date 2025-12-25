@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateApiKey } from '@/lib/auth';
-import { generateWithBananaPro } from '@/lib/banana-client';
+import { generateWithFal } from '@/lib/fal-client';
 import { sendMetricsEvent } from '@/lib/metrics';
 
 /**
@@ -69,8 +69,8 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Generate] Request from client: ${client.name} (${client.id})`);
 
-    // Llamar a Banana PRO
-    const result = await generateWithBananaPro({
+    // Llamar a FAL AI - Virtual Try-On
+    const result = await generateWithFal({
       userImage: body.userImage,
       garments: body.garments,
     });
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     sendMetricsEvent(body.apiKey, {
       type: 'generation',
       timestamp: new Date().toISOString(),
-      model: 'banana-pro',
+      model: 'fal-virtual-try-on',
       clientId: client.id,
       clientName: client.name,
     }).catch(err => {
