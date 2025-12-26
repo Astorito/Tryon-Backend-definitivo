@@ -16,7 +16,7 @@ const METRICS_ENDPOINT = process.env.METRICS_ENDPOINT || 'https://tryon-kappa.ve
 export interface GenerationEvent {
   type: 'generation';
   timestamp: string;
-  model: 'banana-pro';
+  model: 'banana-pro' | 'fal-virtual-try-on' | 'nano-banana-pro';
   clientId: string;
   clientName: string;
 }

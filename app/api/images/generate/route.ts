@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     sendMetricsEvent(body.apiKey, {
       type: 'generation',
       timestamp: new Date().toISOString(),
-      model: 'fal-virtual-try-on',
+      model: 'nano-banana-pro',
       clientId: client.id,
       clientName: client.name,
     }).catch(err => {
