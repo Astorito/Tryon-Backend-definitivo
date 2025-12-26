@@ -5,6 +5,16 @@ const nextConfig = {
   async headers() {
     return [
       {
+        // Headers globales para todas las páginas
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+        ],
+      },
+      {
         source: '/api/widget',
         headers: [
           {
