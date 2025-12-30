@@ -94,10 +94,17 @@ export async function POST(request: NextRequest) {
       // No afecta la respuesta
     });
 
-    // Devolver resultado
+    // Devolver resultado con metadatos para UI
     return NextResponse.json({
       success: true,
       resultImage: result.resultImage,
+      // Metadata for UI state management
+      metadata: {
+        generatedAt: new Date().toISOString(),
+        inputsCount: {
+          garments: body.garments.length,
+        },
+      },
     });
 
   } catch (error) {
