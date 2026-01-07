@@ -26,6 +26,12 @@ const CLIENTS: Record<string, ClientInfo> = {
     apiKey: 'demotryon01',
     active: true,
   },
+  'testtryon01': {
+    id: 'client_003',
+    name: 'Test TryOn',
+    apiKey: 'testtryon01',
+    active: true,
+  },
   // Agregar más clientes aquí
 };
 
