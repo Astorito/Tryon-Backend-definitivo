@@ -1,8 +1,8 @@
 /**
  * Cliente FAL AI - Virtual Try-On
  * 
- * Usa el modelo fal-ai/image-apps-v2/virtual-try-on
- * Documentación: https://fal.ai/models/fal-ai/image-apps-v2/virtual-try-on
+ * Usa el modelo fal-ai/nano-banana/edit
+ * Documentación: https://fal.ai/models/fal-ai/nano-banana/edit
  */
 
 import { fal } from "@fal-ai/client";
@@ -12,8 +12,8 @@ fal.config({
   credentials: process.env.FAL_KEY || process.env.FAL_API_KEY || '',
 });
 
-// Modelo de virtual try-on de FAL
-const FAL_MODEL = 'fal-ai/image-apps-v2/virtual-try-on';
+// Modelo nano-banana/edit para virtual try-on
+const FAL_MODEL = 'fal-ai/nano-banana/edit';
 
 export interface FalTryOnRequest {
   userImage: string; // base64 o URL
@@ -43,7 +43,7 @@ function ensureDataUrl(base64: string): string {
 }
 
 /**
- * Genera una imagen de virtual try-on usando FAL AI
+ * Genera una imagen de virtual try-on usando FAL AI nano-banana/edit
  */
 export async function generateWithFal(
   request: FalTryOnRequest
@@ -61,32 +61,27 @@ export async function generateWithFal(
     console.log('[FAL] Person image length:', personImageUrl.length);
     console.log('[FAL] Clothing image length:', clothingImageUrl.length);
 
-    // Llamar al modelo usando el cliente oficial
+    // Llamar al modelo nano-banana/edit
+    // Prompt simple y directo
     const result = await fal.subscribe(FAL_MODEL, {
       input: {
-        person_image_url: personImageUrl,
-        clothing_image_url: clothingImageUrl,
-        preserve_pose: true,
+        prompt: "Put the clothing from the second image onto the person in the first image. Do not modify anything else. Keep face, pose, background, lighting exactly the same.",
+        image_urls: [personImageUrl, clothingImageUrl],
+        num_images: 1,
+        output_format: "jpeg",
       },
     });
 
     console.log('[FAL] Result keys:', Object.keys(result.data || {}));
 
     // Extraer URL de imagen del resultado
-    // FAL puede devolver 'image' (objeto) o 'images' (array)
     const data = result.data as { 
-      image?: { url: string };
       images?: Array<{ url: string }>;
+      description?: string;
     };
     
-    if (data.image?.url) {
-      return {
-        resultImage: data.image.url,
-        success: true,
-      };
-    }
-    
     if (data.images && data.images[0]?.url) {
+      console.log('[FAL] Success, description:', data.description);
       return {
         resultImage: data.images[0].url,
         success: true,
