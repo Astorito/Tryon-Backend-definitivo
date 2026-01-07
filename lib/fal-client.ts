@@ -44,43 +44,54 @@ function ensureDataUrl(base64: string): string {
 
 /**
  * Genera una imagen de virtual try-on usando FAL AI
+ * Soporta múltiples prendas encadenando llamadas
  */
 export async function generateWithFal(
   request: FalTryOnRequest
 ): Promise<FalTryOnResponse> {
   try {
-    if (!request.garments[0]) {
+    // Filtrar garments válidos
+    const validGarments = request.garments.filter(g => g !== null && g !== undefined && g !== '');
+    
+    if (validGarments.length === 0) {
       throw new Error('Se requiere al menos una prenda');
     }
 
-    // Preparar imágenes como data URLs
-    const personImageUrl = ensureDataUrl(request.userImage);
-    const clothingImageUrl = ensureDataUrl(request.garments[0]);
+    console.log('[FAL] Calling model:', FAL_MODEL, 'with', validGarments.length, 'garments');
 
-    console.log('[FAL] Calling model:', FAL_MODEL);
+    // Empezar con la imagen del usuario
+    let currentPersonImage = ensureDataUrl(request.userImage);
 
-    // Llamar al modelo de virtual try-on
-    const result = await fal.subscribe(FAL_MODEL, {
-      input: {
-        person_image_url: personImageUrl,
-        clothing_image_url: clothingImageUrl,
-        preserve_pose: true,
-      },
-    });
+    // Aplicar cada prenda secuencialmente
+    for (let i = 0; i < validGarments.length; i++) {
+      const clothingImageUrl = ensureDataUrl(validGarments[i]);
+      
+      console.log('[FAL] Applying garment', i + 1, 'of', validGarments.length);
 
-    // Extraer URL de imagen del resultado
-    const data = result.data as { 
-      images?: Array<{ url: string }>;
-    };
-    
-    if (data.images && data.images[0]?.url) {
-      return {
-        resultImage: data.images[0].url,
-        success: true,
+      const result = await fal.subscribe(FAL_MODEL, {
+        input: {
+          person_image_url: currentPersonImage,
+          clothing_image_url: clothingImageUrl,
+          preserve_pose: true,
+        },
+      });
+
+      const data = result.data as { 
+        images?: Array<{ url: string }>;
       };
+      
+      if (!data.images || !data.images[0]?.url) {
+        throw new Error(`No se pudo aplicar la prenda ${i + 1}`);
+      }
+
+      // Usar el resultado como base para la siguiente prenda
+      currentPersonImage = data.images[0].url;
     }
 
-    throw new Error('No se pudo extraer la imagen del resultado');
+    return {
+      resultImage: currentPersonImage,
+      success: true,
+    };
 
   } catch (error) {
     console.error('[FAL] Error:', error);
