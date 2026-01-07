@@ -5,7 +5,12 @@
  * Documentación: https://fal.ai/models/fal-ai/image-apps-v2/virtual-try-on
  */
 
-const FAL_API_KEY = process.env.FAL_API_KEY || '';
+import { fal } from "@fal-ai/client";
+
+// Configurar credenciales
+fal.config({
+  credentials: process.env.FAL_KEY || process.env.FAL_API_KEY || '',
+});
 
 // Modelo de virtual try-on de FAL
 const FAL_MODEL = 'fal-ai/image-apps-v2/virtual-try-on';
@@ -32,7 +37,6 @@ function ensureDataUrl(base64: string): string {
     return base64;
   }
   // Detectar tipo de imagen
-  const isJpeg = base64.startsWith('/9j/');
   const isPng = base64.startsWith('iVBORw');
   const mimeType = isPng ? 'image/png' : 'image/jpeg';
   return `data:${mimeType};base64,${base64}`;
@@ -45,44 +49,46 @@ export async function generateWithFal(
   request: FalTryOnRequest
 ): Promise<FalTryOnResponse> {
   try {
-    if (!FAL_API_KEY) {
-      throw new Error('FAL_API_KEY not configured');
-    }
-
-    // Preparar imágenes
-    const modelImage = ensureDataUrl(request.userImage);
-    const garmentImage = request.garments[0] ? ensureDataUrl(request.garments[0]) : null;
-
-    if (!garmentImage) {
+    if (!request.garments[0]) {
       throw new Error('Se requiere al menos una prenda');
     }
 
-    // Llamar al modelo de virtual try-on
-    const response = await fetch(`https://fal.run/${FAL_MODEL}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Key ${FAL_API_KEY}`,
-        'Content-Type': 'application/json',
+    // Preparar imágenes como data URLs
+    const personImageUrl = ensureDataUrl(request.userImage);
+    const clothingImageUrl = ensureDataUrl(request.garments[0]);
+
+    console.log('[FAL] Calling model:', FAL_MODEL);
+    console.log('[FAL] Person image length:', personImageUrl.length);
+    console.log('[FAL] Clothing image length:', clothingImageUrl.length);
+
+    // Llamar al modelo usando el cliente oficial
+    const result = await fal.subscribe(FAL_MODEL, {
+      input: {
+        person_image_url: personImageUrl,
+        clothing_image_url: clothingImageUrl,
+        preserve_pose: true,
       },
-      body: JSON.stringify({
-        model_image: modelImage,
-        garment_image: garmentImage,
-      }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[FAL] Error response:', errorText);
-      throw new Error(`FAL API error: ${response.status} - ${errorText}`);
-    }
+    console.log('[FAL] Result keys:', Object.keys(result.data || {}));
 
-    const data = await response.json();
-
-    // Extraer URL de imagen
-    const resultUrl = extractImageUrl(data);
-    if (resultUrl) {
+    // Extraer URL de imagen del resultado
+    // FAL puede devolver 'image' (objeto) o 'images' (array)
+    const data = result.data as { 
+      image?: { url: string };
+      images?: Array<{ url: string }>;
+    };
+    
+    if (data.image?.url) {
       return {
-        resultImage: resultUrl,
+        resultImage: data.image.url,
+        success: true,
+      };
+    }
+    
+    if (data.images && data.images[0]?.url) {
+      return {
+        resultImage: data.images[0].url,
         success: true,
       };
     }
@@ -91,35 +97,14 @@ export async function generateWithFal(
 
   } catch (error) {
     console.error('[FAL] Error:', error);
+    
+    // Mejorar el mensaje de error para debugging
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+    
     return {
       resultImage: '',
       success: false,
-      error: error instanceof Error ? error.message : 'Error desconocido',
+      error: `FAL API error: ${errorMessage}`,
     };
   }
-}
-
-/**
- * Extrae la URL de imagen de varios formatos de respuesta
- */
-function extractImageUrl(data: any): string | null {
-  // Formato: { image: { url: "..." } }
-  if (data.image?.url) return data.image.url;
-  
-  // Formato: { image: "url" }
-  if (typeof data.image === 'string') return data.image;
-  
-  // Formato: { output: { url: "..." } }
-  if (data.output?.url) return data.output.url;
-  
-  // Formato: { images: [{ url: "..." }] }
-  if (data.images?.[0]?.url) return data.images[0].url;
-  
-  // Formato: { url: "..." }
-  if (data.url) return data.url;
-  
-  // Formato: { output: "url" }
-  if (typeof data.output === 'string') return data.output;
-
-  return null;
 }
