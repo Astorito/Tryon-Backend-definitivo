@@ -44,52 +44,44 @@ function ensureDataUrl(base64: string): string {
 
 /**
  * Genera una imagen de virtual try-on usando FAL AI
- * Soporta múltiples prendas encadenando llamadas
+ * Soporta hasta 3 prendas aplicadas secuencialmente
  */
 export async function generateWithFal(
   request: FalTryOnRequest
 ): Promise<FalTryOnResponse> {
   try {
-    // Filtrar garments válidos
     const validGarments = request.garments.filter(g => g !== null && g !== undefined && g !== '');
     
     if (validGarments.length === 0) {
       throw new Error('Se requiere al menos una prenda');
     }
 
-    console.log('[FAL] Calling model:', FAL_MODEL, 'with', validGarments.length, 'garments');
+    console.log('[FAL] Processing', validGarments.length, 'garment(s)');
 
-    // Empezar con la imagen del usuario
-    let currentPersonImage = ensureDataUrl(request.userImage);
+    let currentImage = ensureDataUrl(request.userImage);
 
-    // Aplicar cada prenda secuencialmente
     for (let i = 0; i < validGarments.length; i++) {
-      const clothingImageUrl = ensureDataUrl(validGarments[i]);
+      const clothingUrl = ensureDataUrl(validGarments[i]);
       
-      console.log('[FAL] Applying garment', i + 1, 'of', validGarments.length);
-
       const result = await fal.subscribe(FAL_MODEL, {
         input: {
-          person_image_url: currentPersonImage,
-          clothing_image_url: clothingImageUrl,
+          person_image_url: currentImage,
+          clothing_image_url: clothingUrl,
           preserve_pose: true,
         },
       });
 
-      const data = result.data as { 
-        images?: Array<{ url: string }>;
-      };
+      const data = result.data as { images?: Array<{ url: string }> };
       
-      if (!data.images || !data.images[0]?.url) {
-        throw new Error(`No se pudo aplicar la prenda ${i + 1}`);
+      if (!data.images?.[0]?.url) {
+        throw new Error(`Error aplicando prenda ${i + 1}`);
       }
 
-      // Usar el resultado como base para la siguiente prenda
-      currentPersonImage = data.images[0].url;
+      currentImage = data.images[0].url;
     }
 
     return {
-      resultImage: currentPersonImage,
+      resultImage: currentImage,
       success: true,
     };
 
