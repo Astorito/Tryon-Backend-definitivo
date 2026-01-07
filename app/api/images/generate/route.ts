@@ -67,8 +67,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[Generate] Request from client: ${client.name} (${client.id})`);
-
     // Llamar a FAL AI - Virtual Try-On
     const result = await generateWithFal({
       userImage: body.userImage,

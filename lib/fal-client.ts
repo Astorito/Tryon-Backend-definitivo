@@ -49,9 +49,6 @@ export async function generateWithFal(
       throw new Error('FAL_API_KEY not configured');
     }
 
-    const startTime = Date.now();
-    console.log('[FAL] Iniciando generación con image-apps-v2/virtual-try-on...');
-
     // Preparar imágenes
     const modelImage = ensureDataUrl(request.userImage);
     const garmentImage = request.garments[0] ? ensureDataUrl(request.garments[0]) : null;
@@ -59,8 +56,6 @@ export async function generateWithFal(
     if (!garmentImage) {
       throw new Error('Se requiere al menos una prenda');
     }
-
-    console.log('[FAL] Enviando request...');
 
     // Llamar al modelo de virtual try-on
     const response = await fetch(`https://fal.run/${FAL_MODEL}`, {
@@ -82,13 +77,10 @@ export async function generateWithFal(
     }
 
     const data = await response.json();
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`[FAL] Respuesta en ${elapsed}s:`, JSON.stringify(data).slice(0, 300));
 
     // Extraer URL de imagen
     const resultUrl = extractImageUrl(data);
     if (resultUrl) {
-      console.log(`[FAL] ✓ Generación completada en ${elapsed}s`);
       return {
         resultImage: resultUrl,
         success: true,
