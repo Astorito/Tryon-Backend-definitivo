@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@fal-ai/client": "^1.8.1",
+    "@upstash/redis": "^1.36.1",
     "next": "^15.0.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0"

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Async Jobs Test</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 900px; 
+      margin: 0 auto; 
+      padding: 20px;
+      background: #1a1a2e;
+      color: #eee;
+    }
+    h1 { color: #00d4ff; }
+    .section { 
+      background: #16213e; 
+      padding: 20px; 
+      border-radius: 8px; 
+      margin-bottom: 20px;
+    }
+    label { display: block; margin-bottom: 5px; font-weight: 600; }
+    input, textarea, button { 
+      width: 100%; 
+      padding: 10px; 
+      margin-bottom: 15px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      background: #0f0f23;
+      color: #eee;
+    }
+    button { 
+      background: #00d4ff; 
+      color: #000; 
+      font-weight: bold; 
+      cursor: pointer;
+      border: none;
+    }
+    button:hover { background: #00b8e6; }
+    button:disabled { background: #666; cursor: not-allowed; }
+    .log { 
+      background: #0a0a15; 
+      padding: 15px; 
+      border-radius: 4px; 
+      font-family: monospace;
+      font-size: 13px;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    .log-entry { margin-bottom: 8px; }
+    .log-time { color: #888; }
+    .log-info { color: #00d4ff; }
+    .log-success { color: #00ff88; }
+    .log-error { color: #ff4444; }
+    .log-warn { color: #ffaa00; }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: bold;
+      text-transform: uppercase;
+      font-size: 12px;
+    }
+    .status-queued { background: #666; }
+    .status-processing { background: #ff9800; color: #000; }
+    .status-done { background: #4caf50; }
+    .status-error { background: #f44336; }
+    .result-image {
+      max-width: 100%;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+    .timing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-top: 15px;
+    }
+    .timing-box {
+      background: #0a0a15;
+      padding: 10px;
+      border-radius: 4px;
+      text-align: center;
+    }
+    .timing-value { font-size: 24px; font-weight: bold; color: #00d4ff; }
+    .timing-label { font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+  <h1>🚀 Async Jobs Test</h1>
+  
+  <div class="section">
+    <h3>Configuration</h3>
+    <label>API Key</label>
+    <input type="text" id="apiKey" value="demotryon01">
+    
+    <label>API Base URL</label>
+    <input type="text" id="baseUrl" value="">
+    <small style="color:#888">Leave empty for relative URLs (same origin)</small>
+  </div>
+
+  <div class="section">
+    <h3>Images</h3>
+    <label>User Image (base64 or URL)</label>
+    <textarea id="userImage" rows="3" placeholder="Paste base64 or URL..."></textarea>
+    
+    <label>Garment Image (base64 or URL)</label>
+    <textarea id="garmentImage" rows="3" placeholder="Paste base64 or URL..."></textarea>
+  </div>
+
+  <div class="section">
+    <button id="submitBtn" onclick="submitJob()">🚀 Submit Async Job</button>
+    <button id="healthBtn" onclick="checkHealth()" style="background:#333;color:#fff;">🔍 Check Health</button>
+  </div>
+
+  <div class="section">
+    <h3>Job Status</h3>
+    <div id="jobStatus">
+      <span class="status-badge" style="background:#333">No job submitted</span>
+    </div>
+    
+    <div id="timings" class="timing-grid" style="display:none">
+      <div class="timing-box">
+        <div class="timing-value" id="submitTime">-</div>
+        <div class="timing-label">Submit (ms)</div>
+      </div>
+      <div class="timing-box">
+        <div class="timing-value" id="queueTime">-</div>
+        <div class="timing-label">Queue Wait (ms)</div>
+      </div>
+      <div class="timing-box">
+        <div class="timing-value" id="falTime">-</div>
+        <div class="timing-label">FAL Inference (ms)</div>
+      </div>
+      <div class="timing-box">
+        <div class="timing-value" id="totalTime">-</div>
+        <div class="timing-label">Total (ms)</div>
+      </div>
+    </div>
+    
+    <div id="resultContainer" style="display:none; margin-top:20px;">
+      <h4>Result Image</h4>
+      <img id="resultImage" class="result-image" alt="Result">
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Log</h3>
+    <div id="log" class="log"></div>
+  </div>
+
+  <script>
+    let currentJobId = null;
+    let pollInterval = null;
+    let submitTimestamp = null;
+
+    function log(message, type = 'info') {
+      const logEl = document.getElementById('log');
+      const time = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${type}">${message}</span>`;
+      logEl.insertBefore(entry, logEl.firstChild);
+    }
+
+    function getBaseUrl() {
+      return document.getElementById('baseUrl').value || '';
+    }
+
+    async function checkHealth() {
+      log('Checking async jobs health...', 'info');
+      try {
+        const res = await fetch(`${getBaseUrl()}/api/jobs/health`);
+        const data = await res.json();
+        if (res.ok) {
+          log(`✅ Health OK: ${JSON.stringify(data)}`, 'success');
+        } else {
+          log(`❌ Health FAIL: ${JSON.stringify(data)}`, 'error');
+        }
+      } catch (err) {
+        log(`❌ Health error: ${err.message}`, 'error');
+      }
+    }
+
+    async function submitJob() {
+      const apiKey = document.getElementById('apiKey').value;
+      const userImage = document.getElementById('userImage').value;
+      const garmentImage = document.getElementById('garmentImage').value;
+
+      if (!userImage || !garmentImage) {
+        log('Please provide both user and garment images', 'error');
+        return;
+      }
+
+      // Reset state
+      if (pollInterval) clearInterval(pollInterval);
+      document.getElementById('resultContainer').style.display = 'none';
+      document.getElementById('timings').style.display = 'none';
+
+      log('Submitting async job...', 'info');
+      submitTimestamp = Date.now();
+
+      try {
+        const res = await fetch(`${getBaseUrl()}/api/jobs/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            apiKey,
+            userImage,
+            garments: [garmentImage]
+          })
+        });
+
+        const data = await res.json();
+        const submitDuration = Date.now() - submitTimestamp;
+
+        if (!res.ok) {
+          log(`❌ Submit failed: ${JSON.stringify(data)}`, 'error');
+          return;
+        }
+
+        currentJobId = data.job_id;
+        log(`✅ Job submitted in ${submitDuration}ms: ${currentJobId}`, 'success');
+        
+        document.getElementById('submitTime').textContent = submitDuration;
+        document.getElementById('timings').style.display = 'grid';
+        
+        updateStatus({ status: 'queued' });
+        
+        // Start polling
+        pollInterval = setInterval(pollStatus, 2000);
+        pollStatus(); // Immediate first poll
+
+      } catch (err) {
+        log(`❌ Submit error: ${err.message}`, 'error');
+      }
+    }
+
+    async function pollStatus() {
+      if (!currentJobId) return;
+
+      try {
+        const res = await fetch(`${getBaseUrl()}/api/jobs/${currentJobId}/status`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          log(`⚠️ Status error: ${JSON.stringify(data)}`, 'warn');
+          return;
+        }
+
+        updateStatus(data);
+
+        // Update timings
+        const ts = data.timestamps;
+        if (ts.fal_start && ts.created_at) {
+          document.getElementById('queueTime').textContent = ts.fal_start - ts.created_at;
+        }
+        if (ts.fal_end && ts.fal_start) {
+          document.getElementById('falTime').textContent = ts.fal_end - ts.fal_start;
+        }
+        if (ts.completed_at && ts.created_at) {
+          const total = ts.completed_at - ts.created_at;
+          document.getElementById('totalTime').textContent = total;
+        }
+
+        // Check if done
+        if (data.status === 'done') {
+          clearInterval(pollInterval);
+          log(`🎉 Job completed! Image URL: ${data.image_url.substring(0, 50)}...`, 'success');
+          
+          document.getElementById('resultImage').src = data.image_url;
+          document.getElementById('resultContainer').style.display = 'block';
+        }
+
+        if (data.status === 'error') {
+          clearInterval(pollInterval);
+          log(`❌ Job failed: ${data.error}`, 'error');
+        }
+
+      } catch (err) {
+        log(`⚠️ Poll error: ${err.message}`, 'warn');
+      }
+    }
+
+    function updateStatus(data) {
+      const statusEl = document.getElementById('jobStatus');
+      const badge = `<span class="status-badge status-${data.status}">${data.status}</span>`;
+      statusEl.innerHTML = `Job: <code>${currentJobId}</code> ${badge}`;
+      log(`Status: ${data.status}`, data.status === 'done' ? 'success' : 'info');
+    }
+
+    // Check health on load
+    window.onload = () => {
+      checkHealth();
+    };
+  </script>
+</body>
+</html>
