@@ -6,6 +6,13 @@
  */
 
 import { fal } from "@fal-ai/client";
+import { 
+  type FalCallTiming, 
+  type RequestTimings,
+  logLatency,
+  logRequestTimings,
+  calculateTimings 
+} from './latency';
 
 // Configurar credenciales
 fal.config({
@@ -24,6 +31,7 @@ export interface FalTryOnResponse {
   resultImage: string; // URL de la imagen generada
   success: boolean;
   error?: string;
+  timings?: RequestTimings; // Tiempos de latencia detallados
 }
 
 /**
@@ -45,10 +53,19 @@ function ensureDataUrl(base64: string): string {
 /**
  * Genera una imagen de virtual try-on usando FAL AI
  * Soporta hasta 3 prendas aplicadas secuencialmente
+ * 
+ * @param request - Datos de la request
+ * @param requestId - ID opcional para correlacionar logs (generado si no se provee)
  */
 export async function generateWithFal(
-  request: FalTryOnRequest
+  request: FalTryOnRequest,
+  requestId?: string
 ): Promise<FalTryOnResponse> {
+  // === TIMING: Inicio de request ===
+  const reqId = requestId || Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const totalStart = performance.now();
+  const falCalls: FalCallTiming[] = [];
+  
   try {
     const validGarments = request.garments.filter(g => g !== null && g !== undefined && g !== '');
     
@@ -56,12 +73,18 @@ export async function generateWithFal(
       throw new Error('Se requiere al menos una prenda');
     }
 
-    console.log('[FAL] Processing', validGarments.length, 'garment(s)');
+    console.log('[FAL] Processing', validGarments.length, 'garment(s)', `[reqId=${reqId}]`);
 
     let currentImage = ensureDataUrl(request.userImage);
+    
+    // === TIMING: Fin de pre-procesamiento ===
+    const preProcessingEnd = performance.now();
 
     for (let i = 0; i < validGarments.length; i++) {
       const clothingUrl = ensureDataUrl(validGarments[i]);
+      
+      // === TIMING: Inicio llamada FAL ===
+      const falStart = performance.now();
       
       const result = await fal.subscribe(FAL_MODEL, {
         input: {
@@ -69,6 +92,27 @@ export async function generateWithFal(
           clothing_image_url: clothingUrl,
           preserve_pose: true,
         },
+      });
+      
+      // === TIMING: Fin llamada FAL ===
+      const falEnd = performance.now();
+      const falDuration = falEnd - falStart;
+      
+      // Registrar timing de esta llamada
+      falCalls.push({
+        callIndex: i,
+        startMs: falStart - totalStart,
+        endMs: falEnd - totalStart,
+        durationMs: falDuration,
+      });
+      
+      // Log individual por llamada FAL
+      logLatency({
+        requestId: reqId,
+        phase: `fal_call_${i}`,
+        durationMs: Math.round(falDuration),
+        timestamp: new Date().toISOString(),
+        metadata: { garmentIndex: i, totalGarments: validGarments.length },
       });
 
       const data = result.data as { images?: Array<{ url: string }> };
@@ -79,17 +123,44 @@ export async function generateWithFal(
 
       currentImage = data.images[0].url;
     }
+    
+    // === TIMING: Inicio post-procesamiento ===
+    const postProcessingStart = performance.now();
+    const totalEnd = performance.now();
+    
+    // Calcular y loguear timings completos
+    const timings = calculateTimings(
+      reqId,
+      0, // totalStart relativo
+      preProcessingEnd - totalStart,
+      falCalls,
+      postProcessingStart - totalStart,
+      totalEnd - totalStart
+    );
+    
+    logRequestTimings(timings);
 
     return {
       resultImage: currentImage,
       success: true,
+      timings,
     };
 
   } catch (error) {
-    console.error('[FAL] Error:', error);
+    console.error('[FAL] Error:', error, `[reqId=${reqId}]`);
     
     // Mejorar el mensaje de error para debugging
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+    
+    // Loguear timing incluso en error
+    const errorEnd = performance.now();
+    logLatency({
+      requestId: reqId,
+      phase: 'error',
+      durationMs: Math.round(errorEnd - totalStart),
+      timestamp: new Date().toISOString(),
+      metadata: { error: errorMessage, falCallsCompleted: falCalls.length },
+    });
     
     return {
       resultImage: '',

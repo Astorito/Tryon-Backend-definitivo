@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { validateApiKey } from '@/lib/auth';
 import { generateWithFal } from '@/lib/fal-client';
 import { sendMetricsEvent } from '@/lib/metrics';
+import { createTimingContext, elapsed, logLatency } from '@/lib/latency';
 
 /**
  * Endpoint de generación de imágenes
@@ -25,9 +26,20 @@ interface GenerateRequest {
 }
 
 export async function POST(request: NextRequest) {
+  // === TIMING: Inicio del request handler ===
+  const ctx = createTimingContext('generate_request');
+  
   try {
     // Parsear body
     const body: GenerateRequest = await request.json();
+    
+    // === TIMING: Body parseado ===
+    logLatency({
+      requestId: ctx.requestId,
+      phase: 'body_parsed',
+      durationMs: Math.round(elapsed(ctx)),
+      timestamp: new Date().toISOString(),
+    });
     
     // Validar campos requeridos
     if (!body.apiKey) {
@@ -68,9 +80,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Llamar a FAL AI - Virtual Try-On
+    const beforeFal = elapsed(ctx);
     const result = await generateWithFal({
       userImage: body.userImage,
       garments: body.garments,
+    }, ctx.requestId);
+    const afterFal = elapsed(ctx);
+    
+    // === TIMING: Log de llamada FAL completa desde perspectiva del route ===
+    logLatency({
+      requestId: ctx.requestId,
+      phase: 'fal_total_from_route',
+      durationMs: Math.round(afterFal - beforeFal),
+      timestamp: new Date().toISOString(),
+      metadata: { garmentsCount: body.garments.length },
     });
 
     if (!result.success) {
@@ -93,6 +116,20 @@ export async function POST(request: NextRequest) {
     });
 
     // Devolver resultado con metadatos para UI
+    const totalDuration = elapsed(ctx);
+    
+    // === TIMING: Log final del request ===
+    logLatency({
+      requestId: ctx.requestId,
+      phase: 'request_complete',
+      durationMs: Math.round(totalDuration),
+      timestamp: new Date().toISOString(),
+      metadata: { 
+        success: true,
+        falTimings: result.timings,
+      },
+    });
+    
     return NextResponse.json({
       success: true,
       resultImage: result.resultImage,
@@ -102,16 +139,33 @@ export async function POST(request: NextRequest) {
         inputsCount: {
           garments: body.garments.length,
         },
+        // Incluir timings en respuesta para debugging del frontend
+        timings: result.timings ? {
+          requestId: ctx.requestId,
+          totalMs: Math.round(totalDuration),
+          falInferenceMs: result.timings.breakdown.falInferenceMs,
+          backendOverheadMs: result.timings.backendOverheadMs,
+        } : undefined,
       },
     });
 
   } catch (error) {
     console.error('[Generate] Error:', error);
     
+    // === TIMING: Log de error ===
+    logLatency({
+      requestId: ctx.requestId,
+      phase: 'request_error',
+      durationMs: Math.round(elapsed(ctx)),
+      timestamp: new Date().toISOString(),
+      metadata: { error: error instanceof Error ? error.message : 'Unknown' },
+    });
+    
     return NextResponse.json(
       { 
         error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Unknown error',
+        requestId: ctx.requestId, // Para debugging
       },
       { status: 500 }
     );
