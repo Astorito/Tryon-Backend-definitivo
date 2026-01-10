@@ -1,8 +1,13 @@
 /**
  * Cliente FAL AI - Virtual Try-On
  * 
- * Usa el modelo fal-ai/image-apps-v2/virtual-try-on
- * Documentación: https://fal.ai/models/fal-ai/image-apps-v2/virtual-try-on
+ * Usa el modelo fal-ai/bytedance/seedream/v4.5/edit
+ * Documentación: https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/edit
+ * 
+ * Este modelo de edición permite virtual try-on pasando:
+ * - Imagen 1: Foto de la persona
+ * - Imagen 2+: Prendas a aplicar
+ * - Prompt: Instrucción de vestir a la persona con las prendas
  */
 
 import { fal } from "@fal-ai/client";
@@ -19,8 +24,8 @@ fal.config({
   credentials: process.env.FAL_KEY || process.env.FAL_API_KEY || '',
 });
 
-// Modelo de virtual try-on de FAL
-const FAL_MODEL = 'fal-ai/image-apps-v2/virtual-try-on';
+// Modelo SeedDream v4.5 Edit de ByteDance
+const FAL_MODEL = 'fal-ai/bytedance/seedream/v4.5/edit';
 
 export interface FalTryOnRequest {
   userImage: string; // base64 o URL
@@ -51,8 +56,11 @@ function ensureDataUrl(base64: string): string {
 }
 
 /**
- * Genera una imagen de virtual try-on usando FAL AI
- * Soporta hasta 3 prendas aplicadas secuencialmente
+ * Genera una imagen de virtual try-on usando FAL AI SeedDream v4.5 Edit
+ * 
+ * A diferencia del modelo anterior, este usa:
+ * - prompt: Instrucción de texto para la edición
+ * - image_urls: Array con persona + prendas
  * 
  * @param request - Datos de la request
  * @param requestId - ID opcional para correlacionar logs (generado si no se provee)
@@ -73,65 +81,76 @@ export async function generateWithFal(
       throw new Error('Se requiere al menos una prenda');
     }
 
-    console.log('[FAL] Processing', validGarments.length, 'garment(s)', `[reqId=${reqId}]`);
+    console.log('[FAL] Processing', validGarments.length, 'garment(s) with SeedDream v4.5 Edit', `[reqId=${reqId}]`);
 
-    let currentImage = ensureDataUrl(request.userImage);
+    // Preparar URLs de imágenes: persona primero, luego prendas
+    const personImage = ensureDataUrl(request.userImage);
+    const garmentImages = validGarments.map(g => ensureDataUrl(g));
+    const allImageUrls = [personImage, ...garmentImages];
+    
+    // Construir prompt dinámico para virtual try-on
+    const garmentDescriptions = garmentImages.map((_, i) => `Figure ${i + 2}`).join(' and ');
+    const prompt = validGarments.length === 1
+      ? `Add the clothing garment from Figure 2 onto the person in Figure 1. DO NOT MODIFY the structure, shape, pose, face, or proportions of the original image. KEEP THE ORIGINAL IMAGE EXACTLY AS IT IS, only incorporating the clothing garment onto the person.`
+      : `Add the clothing garments from ${garmentDescriptions} onto the person in Figure 1. DO NOT MODIFY the structure, shape, pose, face, or proportions of the original image. KEEP THE ORIGINAL IMAGE EXACTLY AS IT IS, only incorporating the clothing garments onto the person.`;
     
     // === TIMING: Fin de pre-procesamiento ===
     const preProcessingEnd = performance.now();
-
-    for (let i = 0; i < validGarments.length; i++) {
-      const clothingUrl = ensureDataUrl(validGarments[i]);
-      
-      // === TIMING: Inicio llamada FAL ===
-      const falStart = performance.now();
-      
-      const result = await fal.subscribe(FAL_MODEL, {
-        input: {
-          person_image_url: currentImage,
-          clothing_image_url: clothingUrl,
-          preserve_pose: true,
-        },
-      });
-      
-      // === TIMING: Fin llamada FAL ===
-      const falEnd = performance.now();
-      const falDuration = falEnd - falStart;
-      
-      // Registrar timing de esta llamada
-      falCalls.push({
-        callIndex: i,
-        startMs: falStart - totalStart,
-        endMs: falEnd - totalStart,
-        durationMs: falDuration,
-      });
-      
-      // Log individual por llamada FAL
-      logLatency({
-        requestId: reqId,
-        phase: `fal_call_${i}`,
-        durationMs: Math.round(falDuration),
-        timestamp: new Date().toISOString(),
-        metadata: { garmentIndex: i, totalGarments: validGarments.length },
-      });
-
-      const data = result.data as { images?: Array<{ url: string }> };
-      
-      if (!data.images?.[0]?.url) {
-        throw new Error(`Error aplicando prenda ${i + 1}`);
-      }
-
-      currentImage = data.images[0].url;
-    }
     
-    // === TIMING: Inicio post-procesamiento ===
+    // === TIMING: Inicio llamada FAL ===
+    const falStart = performance.now();
+    
+    const result = await fal.subscribe(FAL_MODEL, {
+      input: {
+        prompt,
+        image_urls: allImageUrls,
+        image_size: 'auto_4K',
+        num_images: 1,
+        enable_safety_checker: true,
+      },
+    });
+    
+    // === TIMING: Fin llamada FAL ===
+    const falEnd = performance.now();
+    const falDuration = falEnd - falStart;
+    
+    // Registrar timing de esta llamada
+    falCalls.push({
+      callIndex: 0,
+      startMs: falStart - totalStart,
+      endMs: falEnd - totalStart,
+      durationMs: falDuration,
+    });
+    
+    // Log de la llamada FAL
+    logLatency({
+      requestId: reqId,
+      phase: 'fal_call_0',
+      durationMs: Math.round(falDuration),
+      timestamp: new Date().toISOString(),
+      metadata: { 
+        model: FAL_MODEL,
+        totalImages: allImageUrls.length,
+        garments: validGarments.length 
+      },
+    });
+
+    const data = result.data as { images?: Array<{ url: string }> };
+    
+    if (!data.images?.[0]?.url) {
+      throw new Error('Error generando imagen con SeedDream');
+    }
+
+    const resultImage = data.images[0].url;
+    
+    // === TIMING: Post-procesamiento ===
     const postProcessingStart = performance.now();
     const totalEnd = performance.now();
     
     // Calcular y loguear timings completos
     const timings = calculateTimings(
       reqId,
-      0, // totalStart relativo
+      0,
       preProcessingEnd - totalStart,
       falCalls,
       postProcessingStart - totalStart,
@@ -141,7 +160,7 @@ export async function generateWithFal(
     logRequestTimings(timings);
 
     return {
-      resultImage: currentImage,
+      resultImage,
       success: true,
       timings,
     };
@@ -149,17 +168,15 @@ export async function generateWithFal(
   } catch (error) {
     console.error('[FAL] Error:', error, `[reqId=${reqId}]`);
     
-    // Mejorar el mensaje de error para debugging
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
     
-    // Loguear timing incluso en error
     const errorEnd = performance.now();
     logLatency({
       requestId: reqId,
       phase: 'error',
       durationMs: Math.round(errorEnd - totalStart),
       timestamp: new Date().toISOString(),
-      metadata: { error: errorMessage, falCallsCompleted: falCalls.length },
+      metadata: { error: errorMessage, model: FAL_MODEL },
     });
     
     return {
