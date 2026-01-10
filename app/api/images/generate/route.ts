@@ -12,6 +12,8 @@ import { createTimingContext, elapsed, logLatency } from '@/lib/latency';
  * - apiKey: API key del cliente
  * - userImage: imagen del usuario (base64)
  * - garments: array de imágenes de prendas (base64)
+ * - _requestId: (opcional) ID del frontend para correlación
+ * - _feClickTs: (opcional) timestamp del click en frontend
  * 
  * Devuelve:
  * - resultImage: imagen generada (base64)
@@ -19,25 +21,62 @@ import { createTimingContext, elapsed, logLatency } from '@/lib/latency';
  * NO persiste nada, NO cachea resultados.
  */
 
+// === COLD START DETECTION ===
+// Variable global que persiste mientras el lambda/edge está warm
+let lastRequestTime = 0;
+let requestCount = 0;
+
+function detectColdStart(): { isCold: boolean; timeSinceLastMs: number } {
+  const now = Date.now();
+  const timeSinceLastMs = lastRequestTime === 0 ? 0 : now - lastRequestTime;
+  const isCold = lastRequestTime === 0 || timeSinceLastMs > 300000; // 5 min threshold
+  lastRequestTime = now;
+  requestCount++;
+  return { isCold, timeSinceLastMs };
+}
+
 interface GenerateRequest {
   apiKey: string;
   userImage: string;
   garments: string[];
+  _requestId?: string;    // Frontend correlation ID
+  _feClickTs?: number;    // Frontend click timestamp
 }
 
 export async function POST(request: NextRequest) {
   // === TIMING: Inicio del request handler ===
+  const beReceivedTs = Date.now();
+  const coldStartInfo = detectColdStart();
   const ctx = createTimingContext('generate_request');
   
   try {
     // Parsear body
     const body: GenerateRequest = await request.json();
+    const bodyParsedTs = Date.now();
+    
+    // Use frontend request ID if provided, otherwise use backend generated
+    const correlationId = body._requestId || ctx.requestId;
+    
+    // === TIMING: Request received (with cold start info) ===
+    logLatency({
+      requestId: correlationId,
+      phase: 'be_request_received',
+      durationMs: 0,
+      timestamp: new Date().toISOString(),
+      metadata: { 
+        cold_start: coldStartInfo.isCold,
+        time_since_last_ms: coldStartInfo.timeSinceLastMs,
+        request_count: requestCount,
+        fe_click_ts: body._feClickTs,
+        network_latency_up_ms: body._feClickTs ? beReceivedTs - body._feClickTs : null,
+      },
+    });
     
     // === TIMING: Body parseado ===
     logLatency({
-      requestId: ctx.requestId,
-      phase: 'body_parsed',
-      durationMs: Math.round(elapsed(ctx)),
+      requestId: correlationId,
+      phase: 'be_body_parsed',
+      durationMs: bodyParsedTs - beReceivedTs,
       timestamp: new Date().toISOString(),
     });
     
@@ -71,7 +110,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar API key
+    const authStartTs = Date.now();
     const client = validateApiKey(body.apiKey);
+    const authEndTs = Date.now();
+    
+    // === TIMING: Auth completed ===
+    logLatency({
+      requestId: correlationId,
+      phase: 'be_auth_done',
+      durationMs: authEndTs - authStartTs,
+      timestamp: new Date().toISOString(),
+    });
+    
     if (!client) {
       return NextResponse.json(
         { error: 'Invalid or inactive API key' },
@@ -79,21 +129,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // === TIMING: FAL call start ===
+    const falStartTs = Date.now();
+    logLatency({
+      requestId: correlationId,
+      phase: 'be_fal_request_sent',
+      durationMs: falStartTs - beReceivedTs,
+      timestamp: new Date().toISOString(),
+      metadata: { 
+        overhead_pre_fal_ms: falStartTs - beReceivedTs,
+        garments_count: body.garments.length 
+      },
+    });
+
     // Llamar a FAL AI - Virtual Try-On
-    const beforeFal = elapsed(ctx);
     const result = await generateWithFal({
       userImage: body.userImage,
       garments: body.garments,
-    }, ctx.requestId);
-    const afterFal = elapsed(ctx);
+    }, correlationId);
     
-    // === TIMING: Log de llamada FAL completa desde perspectiva del route ===
+    const falEndTs = Date.now();
+    
+    // === TIMING: FAL call end ===
     logLatency({
-      requestId: ctx.requestId,
-      phase: 'fal_total_from_route',
-      durationMs: Math.round(afterFal - beforeFal),
+      requestId: correlationId,
+      phase: 'be_fal_response_received',
+      durationMs: falEndTs - falStartTs,
       timestamp: new Date().toISOString(),
-      metadata: { garmentsCount: body.garments.length },
+      metadata: { 
+        fal_duration_ms: falEndTs - falStartTs,
+        success: result.success,
+      },
     });
 
     if (!result.success) {
@@ -115,18 +181,22 @@ export async function POST(request: NextRequest) {
       // No afecta la respuesta
     });
 
-    // Devolver resultado con metadatos para UI
-    const totalDuration = elapsed(ctx);
+    // Preparar response
+    const responseSentTs = Date.now();
+    const totalDuration = responseSentTs - beReceivedTs;
+    const backendOverhead = totalDuration - (falEndTs - falStartTs);
     
-    // === TIMING: Log final del request ===
+    // === TIMING: Response sent ===
     logLatency({
-      requestId: ctx.requestId,
-      phase: 'request_complete',
-      durationMs: Math.round(totalDuration),
+      requestId: correlationId,
+      phase: 'be_response_sent',
+      durationMs: totalDuration,
       timestamp: new Date().toISOString(),
       metadata: { 
         success: true,
-        falTimings: result.timings,
+        backend_overhead_ms: backendOverhead,
+        fal_duration_ms: falEndTs - falStartTs,
+        cold_start: coldStartInfo.isCold,
       },
     });
     
@@ -139,26 +209,33 @@ export async function POST(request: NextRequest) {
         inputsCount: {
           garments: body.garments.length,
         },
-        // Incluir timings en respuesta para debugging del frontend
-        timings: result.timings ? {
-          requestId: ctx.requestId,
-          totalMs: Math.round(totalDuration),
-          falInferenceMs: result.timings.breakdown.falInferenceMs,
-          backendOverheadMs: result.timings.backendOverheadMs,
-        } : undefined,
+        // Timings para frontend (correlación e2e)
+        timings: {
+          requestId: correlationId,
+          be_received_ts: beReceivedTs,
+          be_response_sent_ts: responseSentTs,
+          total_backend_ms: totalDuration,
+          fal_duration_ms: falEndTs - falStartTs,
+          backend_overhead_ms: backendOverhead,
+          cold_start: coldStartInfo.isCold,
+        },
       },
     });
 
   } catch (error) {
     console.error('[Generate] Error:', error);
+    const errorTs = Date.now();
     
     // === TIMING: Log de error ===
     logLatency({
       requestId: ctx.requestId,
-      phase: 'request_error',
-      durationMs: Math.round(elapsed(ctx)),
+      phase: 'be_request_error',
+      durationMs: errorTs - beReceivedTs,
       timestamp: new Date().toISOString(),
-      metadata: { error: error instanceof Error ? error.message : 'Unknown' },
+      metadata: { 
+        error: error instanceof Error ? error.message : 'Unknown',
+        cold_start: coldStartInfo.isCold,
+      },
     });
     
     return NextResponse.json(
