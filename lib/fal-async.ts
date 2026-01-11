@@ -21,7 +21,8 @@ fal.config({
   credentials: process.env.FAL_KEY || process.env.FAL_API_KEY || '',
 });
 
-const FAL_MODEL = 'fal-ai/bytedance/seedream/v4.5/edit';
+// Modelo Nano Banana Edit - optimizado para velocidad
+const FAL_MODEL = 'fal-ai/nano-banana/edit';
 
 export interface AsyncFalRequest {
   jobId: string;
@@ -89,14 +90,11 @@ export async function processJobAsync(request: AsyncFalRequest): Promise<void> {
       : `Add the clothing garments from ${garmentDescriptions} onto the person in Figure 1. DO NOT MODIFY the structure, shape, pose, face, or proportions of the original image. KEEP THE ORIGINAL IMAGE EXACTLY AS IT IS, only incorporating the clothing garments onto the person.`;
 
     // === FASE 2: Llamar a FAL ===
-    // NOTA: Mismos parámetros exactos que el endpoint sync actual
+    // nano-banana/edit: solo requiere prompt + image_urls
     const result = await fal.subscribe(FAL_MODEL, {
       input: {
         prompt,
         image_urls: allImageUrls,
-        image_size: 'auto_4K',
-        num_images: 1,
-        enable_safety_checker: true,
       },
     });
 

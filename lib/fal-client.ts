@@ -24,8 +24,8 @@ fal.config({
   credentials: process.env.FAL_KEY || process.env.FAL_API_KEY || '',
 });
 
-// Modelo SeedDream v4.5 Edit de ByteDance
-const FAL_MODEL = 'fal-ai/bytedance/seedream/v4.5/edit';
+// Modelo Nano Banana Edit - optimizado para velocidad
+const FAL_MODEL = 'fal-ai/nano-banana/edit';
 
 export interface FalTryOnRequest {
   userImage: string; // base64 o URL
@@ -104,9 +104,6 @@ export async function generateWithFal(
       input: {
         prompt,
         image_urls: allImageUrls,
-        image_size: 'auto_4K',
-        num_images: 1,
-        enable_safety_checker: true,
       },
     });
     
