@@ -8,24 +8,24 @@
     * { box-sizing: border-box; }
     body { 
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      max-width: 900px; 
+      max-width: 720px; 
       margin: 0 auto; 
-      padding: 20px;
+      padding: 16px;
       background: #1a1a2e;
       color: #eee;
     }
-    h1 { color: #00d4ff; }
+    h1 { color: #00d4ff; margin-bottom: 16px; }
     .section { 
       background: #16213e; 
-      padding: 20px; 
-      border-radius: 8px; 
-      margin-bottom: 20px;
+      padding: 16px; 
+      border-radius: 6px; 
+      margin-bottom: 16px;
     }
-    label { display: block; margin-bottom: 5px; font-weight: 600; }
+    label { display: block; margin-bottom: 4px; font-weight: 600; font-size: 13px; }
     input, textarea, button { 
       width: 100%; 
-      padding: 10px; 
-      margin-bottom: 15px;
+      padding: 8px; 
+      margin-bottom: 12px;
       border: 1px solid #333;
       border-radius: 4px;
       background: #0f0f23;
@@ -42,15 +42,15 @@
     button:disabled { background: #666; cursor: not-allowed; }
     .log { 
       background: #0a0a15; 
-      padding: 15px; 
+      padding: 12px; 
       border-radius: 4px; 
       font-family: monospace;
-      font-size: 13px;
-      max-height: 300px;
+      font-size: 12px;
+      max-height: 240px;
       overflow-y: auto;
       white-space: pre-wrap;
     }
-    .log-entry { margin-bottom: 8px; }
+    .log-entry { margin-bottom: 6px; }
     .log-time { color: #888; }
     .log-info { color: #00d4ff; }
     .log-success { color: #00ff88; }
@@ -58,11 +58,11 @@
     .log-warn { color: #ffaa00; }
     .status-badge {
       display: inline-block;
-      padding: 4px 12px;
-      border-radius: 20px;
+      padding: 3px 10px;
+      border-radius: 16px;
       font-weight: bold;
       text-transform: uppercase;
-      font-size: 12px;
+      font-size: 11px;
     }
     .status-queued { background: #666; }
     .status-processing { background: #ff9800; color: #000; }
@@ -70,23 +70,23 @@
     .status-error { background: #f44336; }
     .result-image {
       max-width: 100%;
-      border-radius: 8px;
-      margin-top: 10px;
+      border-radius: 6px;
+      margin-top: 8px;
     }
     .timing-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 10px;
-      margin-top: 15px;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 8px;
+      margin-top: 12px;
     }
     .timing-box {
       background: #0a0a15;
-      padding: 10px;
+      padding: 8px;
       border-radius: 4px;
       text-align: center;
     }
-    .timing-value { font-size: 24px; font-weight: bold; color: #00d4ff; }
-    .timing-label { font-size: 12px; color: #888; }
+    .timing-value { font-size: 20px; font-weight: bold; color: #00d4ff; }
+    .timing-label { font-size: 11px; color: #888; }
   </style>
 </head>
 <body>
@@ -99,21 +99,21 @@
     
     <label>API Base URL</label>
     <input type="text" id="baseUrl" value="">
-    <small style="color:#888">Leave empty for relative URLs (same origin)</small>
+    <small style="color:#888;font-size:11px">Leave empty for relative URLs</small>
   </div>
 
   <div class="section">
     <h3>Images</h3>
     <label>User Image (base64 or URL)</label>
-    <textarea id="userImage" rows="3" placeholder="Paste base64 or URL..."></textarea>
+    <textarea id="userImage" rows="2" placeholder="Paste base64 or URL..."></textarea>
     
     <label>Garment Image (base64 or URL)</label>
-    <textarea id="garmentImage" rows="3" placeholder="Paste base64 or URL..."></textarea>
+    <textarea id="garmentImage" rows="2" placeholder="Paste base64 or URL..."></textarea>
   </div>
 
   <div class="section">
     <button id="submitBtn" onclick="submitJob()">🚀 Submit Async Job</button>
-    <button id="healthBtn" onclick="checkHealth()" style="background:#333;color:#fff;">🔍 Check Health</button>
+    <button id="healthBtn" onclick="checkHealth()" style="background:#333;color:#fff;margin-top:0;">🔍 Check Health</button>
   </div>
 
   <div class="section">
