@@ -5,5 +5,16 @@
       "path": "/api/health",
       "schedule": "*/5 * * * *"
     }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "x-vercel-protection-bypass",
+          "value": "true"
+        }
+      ]
+    }
   ]
 }
