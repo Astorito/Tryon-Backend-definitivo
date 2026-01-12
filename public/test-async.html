@@ -99,6 +99,83 @@
     }
     .timing-value { font-size: 16px; font-weight: bold; color: #00d4ff; }
     .timing-label { font-size: 10px; color: #888; }
+
+    /* Result panel thumbnails */
+    .result-thumbnails {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      padding: 12px;
+      background: #fff;
+    }
+    .result-thumb {
+      width: 56px;
+      height: 56px;
+      border-radius: 8px;
+      border: 2px solid #e0e0e0;
+      object-fit: cover;
+      background: #f5f5f5;
+    }
+    .result-thumb.active {
+      border-color: #7c3aed;
+    }
+    .result-thumb-add {
+      width: 56px;
+      height: 56px;
+      border-radius: 8px;
+      border: 2px dashed #ccc;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: #999;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .result-thumb-add:hover {
+      border-color: #7c3aed;
+      color: #7c3aed;
+    }
+    .try-another-btn {
+      display: block;
+      width: calc(100% - 24px);
+      margin: 0 12px 12px 12px;
+      padding: 14px;
+      background: linear-gradient(90deg, #f59e0b, #f97316);
+      color: #fff;
+      font-weight: bold;
+      font-size: 15px;
+      border: none;
+      border-radius: 24px;
+      cursor: pointer;
+      text-align: center;
+    }
+    .try-another-btn:hover {
+      background: linear-gradient(90deg, #d97706, #ea580c);
+    }
+    .result-close-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.5);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .result-close-btn:hover {
+      background: rgba(0,0,0,0.7);
+    }
+    .result-image-wrapper {
+      position: relative;
+    }
   </style>
 </head>
 <body>
@@ -154,8 +231,16 @@
     </div>
     
     <div id="resultContainer" class="result-container" style="display:none;">
-      <h4>Result Image</h4>
-      <img id="resultImage" class="result-image" alt="Result">
+      <div class="result-image-wrapper">
+        <img id="resultImage" class="result-image" alt="Result">
+        <button class="result-close-btn" onclick="closeResult()" title="Close">×</button>
+      </div>
+      <div class="result-thumbnails">
+        <img id="thumbUser" class="result-thumb" alt="User" title="Your photo">
+        <img id="thumbGarment" class="result-thumb active" alt="Garment" title="Garment used">
+        <div class="result-thumb-add" onclick="addAnotherGarment()" title="Add another garment">+</div>
+      </div>
+      <button class="try-another-btn" onclick="tryAnotherLook()">Try another look</button>
     </div>
   </div>
 
@@ -285,6 +370,12 @@
           
           document.getElementById('resultImage').src = data.image_url;
           document.getElementById('resultContainer').style.display = 'block';
+          
+          // Show thumbnails
+          const userImg = document.getElementById('userImage').value;
+          const garmentImg = document.getElementById('garmentImage').value;
+          document.getElementById('thumbUser').src = userImg.startsWith('data:') ? userImg : userImg;
+          document.getElementById('thumbGarment').src = garmentImg.startsWith('data:') ? garmentImg : garmentImg;
         }
 
         if (data.status === 'error') {
@@ -302,6 +393,21 @@
       const badge = `<span class="status-badge status-${data.status}">${data.status}</span>`;
       statusEl.innerHTML = `Job: <code>${currentJobId}</code> ${badge}`;
       log(`Status: ${data.status}`, data.status === 'done' ? 'success' : 'info');
+    }
+
+    function closeResult() {
+      document.getElementById('resultContainer').style.display = 'none';
+    }
+
+    function tryAnotherLook() {
+      document.getElementById('resultContainer').style.display = 'none';
+      document.getElementById('garmentImage').value = '';
+      document.getElementById('garmentImage').focus();
+      log('Ready for a new garment!', 'info');
+    }
+
+    function addAnotherGarment() {
+      log('Adding another garment is not yet supported (1 garment max for speed)', 'warn');
     }
 
     // Check health on load
