@@ -22,7 +22,7 @@ fal.config({
 });
 
 // Modelo Nano Banana Edit - optimizado para velocidad
-const FAL_MODEL = 'fal-ai/nano-banana/edit';
+const FAL_MODEL = 'fal-ai/nano-banana-pro/edit';
 
 export interface AsyncFalRequest {
   jobId: string;
