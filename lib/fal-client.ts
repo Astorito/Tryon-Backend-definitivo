@@ -42,6 +42,7 @@ export interface FalTryOnResponse {
 /**
  * Convierte base64 a data URL si es necesario
  */
+import { getHttpsAgent } from './http-agent';
 function ensureDataUrl(base64: string): string {
   if (base64.startsWith('data:')) {
     return base64;
@@ -49,6 +50,13 @@ function ensureDataUrl(base64: string): string {
   if (base64.startsWith('http://') || base64.startsWith('https://')) {
     return base64;
   }
+// Configurar HTTP agent con keep-alive
+if (typeof window === 'undefined') {
+  // Solo en Node.js (backend), no en browser
+  const agent = getHttpsAgent();
+  // FAL client usa fetch internamente, configurar agent global
+  (global as any).falHttpAgent = agent;
+}
   // Detectar tipo de imagen
   const isPng = base64.startsWith('iVBORw');
   const mimeType = isPng ? 'image/png' : 'image/jpeg';
@@ -65,8 +73,17 @@ function ensureDataUrl(base64: string): string {
  * @param request - Datos de la request
  * @param requestId - ID opcional para correlacionar logs (generado si no se provee)
  */
+export interface GenerateInput {
+  userImage: string;  // Puede ser base64 o URL
+  garments: string[]; // Pueden ser base64 o URLs
+}
+
+function isUrl(str: string): boolean {
+  return str.startsWith('http://') || str.startsWith('https://');
+}
+
 export async function generateWithFal(
-  request: FalTryOnRequest,
+  request: GenerateInput,
   requestId?: string
 ): Promise<FalTryOnResponse> {
   // === TIMING: Inicio de request ===
@@ -83,9 +100,9 @@ export async function generateWithFal(
 
     console.log('[FAL] Processing', validGarments.length, 'garment(s) with SeedDream v4.5 Edit', `[reqId=${reqId}]`);
 
-    // Preparar URLs de imágenes: persona primero, luego prendas
-    const personImage = ensureDataUrl(request.userImage);
-    const garmentImages = validGarments.map(g => ensureDataUrl(g));
+    // Preparar imágenes: persona primero, luego prendas (acepta base64 o URL)
+    const personImage = request.userImage;
+    const garmentImages = validGarments;
     const allImageUrls = [personImage, ...garmentImages];
     
     // Construir prompt dinámico para virtual try-on
@@ -103,7 +120,7 @@ export async function generateWithFal(
     const result = await fal.subscribe(FAL_MODEL, {
       input: {
         prompt,
-        image_urls: allImageUrls,
+        image_urls: allImageUrls, // Puede ser base64 o URLs
       },
     });
     

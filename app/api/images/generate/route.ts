@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateApiKey } from '@/lib/auth';
 import { generateWithFal } from '@/lib/fal-client';
-import { sendMetricsEvent } from '@/lib/metrics';
+import { recordEvent } from '@/lib/metrics-store';
 import { createTimingContext, elapsed, logLatency } from '@/lib/latency';
 
 /**
@@ -37,10 +37,12 @@ function detectColdStart(): { isCold: boolean; timeSinceLastMs: number } {
 
 interface GenerateRequest {
   apiKey: string;
-  userImage: string;
-  garments: string[];
-  _requestId?: string;    // Frontend correlation ID
-  _feClickTs?: number;    // Frontend click timestamp
+  userImage?: string;          // Mantener para backward compatibility
+  garments?: string[];         // Mantener para backward compatibility
+  userImageUrl?: string;       // NUEVO
+  garmentUrls?: string[];      // NUEVO
+  _requestId?: string;
+  _feClickTs?: number;
 }
 
 export async function POST(request: NextRequest) {
@@ -88,21 +90,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!body.userImage) {
+
+    // Determinar si usa URLs o base64
+    const useUrls = !!body.userImageUrl;
+    const userInput = useUrls ? body.userImageUrl : body.userImage;
+    const garmentInputs = useUrls ? body.garmentUrls : body.garments;
+
+    if (!userInput) {
       return NextResponse.json(
-        { error: 'Missing userImage' },
+        { error: 'Missing userImage or userImageUrl' },
         { status: 400 }
       );
     }
 
-    if (!body.garments || body.garments.length === 0) {
+    if (!garmentInputs || garmentInputs.length === 0) {
       return NextResponse.json(
         { error: 'At least one garment is required' },
         { status: 400 }
       );
     }
 
-    if (body.garments.length > 4) {
+    if (garmentInputs.length > 4) {
       return NextResponse.json(
         { error: 'Maximum 4 garments allowed' },
         { status: 400 }
@@ -138,14 +146,14 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
       metadata: { 
         overhead_pre_fal_ms: falStartTs - beReceivedTs,
-        garments_count: body.garments.length 
+        garments_count: (body.garments ?? []).length 
       },
     });
 
     // Llamar a FAL AI - Virtual Try-On
     const result = await generateWithFal({
-      userImage: body.userImage,
-      garments: body.garments,
+      userImage: userInput,
+      garments: garmentInputs,
     }, correlationId);
     
     const falEndTs = Date.now();
@@ -169,8 +177,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Enviar métricas (no bloqueante)
-    sendMetricsEvent(body.apiKey, {
+
+    // Record metrics (non-blocking)
+    recordEvent(body.apiKey, {
       type: 'generation',
       timestamp: new Date().toISOString(),
       model: 'fal-virtual-try-on',
@@ -178,7 +187,6 @@ export async function POST(request: NextRequest) {
       clientName: client.name,
     }).catch(err => {
       console.error('[Generate] Metrics error:', err);
-      // No afecta la respuesta
     });
 
     // Preparar response
@@ -207,7 +215,7 @@ export async function POST(request: NextRequest) {
       metadata: {
         generatedAt: new Date().toISOString(),
         inputsCount: {
-          garments: body.garments.length,
+          garments: (body.garments ?? []).length,
         },
         // Timings para frontend (correlación e2e)
         timings: {

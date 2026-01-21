@@ -1,3 +1,5 @@
+import { getRedis } from './redis';
+
 /**
  * Almacenamiento de métricas en memoria
  * 
@@ -41,7 +43,7 @@ const registeredClients: Map<string, { name: string; createdAt: string }> = new 
 /**
  * Registra un nuevo evento de métrica
  */
-export function recordEvent(clientKey: string, event: Omit<MetricEvent, 'id' | 'clientKey'>): void {
+export function recordEventInMemory(clientKey: string, event: Omit<MetricEvent, 'id' | 'clientKey'>): void {
   const fullEvent: MetricEvent = {
     ...event,
     id: `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -178,4 +180,62 @@ export function deleteClient(clientKey: string): boolean {
   registeredClients.delete(clientKey);
   metricsStore.delete(clientKey);
   return existed;
+}
+
+export interface GenerationMetric {
+  id: string;
+  client_id: string;
+  timestamp: number;
+  endpoint: string;
+  duration_total_ms: number;
+  duration_fal_ms: number;
+  status: 'success' | 'error';
+  error: string | null;
+  metadata: {
+    model: string;
+    garments_count: number;
+    cold_start: boolean;
+    job_id?: string;
+  };
+}
+
+export async function recordEvent(clientKey: string, event: {
+  type: string;
+  timestamp: string;
+  model: string;
+  jobId?: string;
+  clientId?: string;
+  clientName?: string;
+}): Promise<void> {
+  const redis = getRedis();
+  const client = await getClientByApiKey(clientKey);
+  
+  if (!client) {
+    console.warn(`[Metrics] Unknown client key: ${clientKey}`);
+    return;
+  }
+
+  const genId = `gen_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  const metric: GenerationMetric = {
+    id: genId,
+    client_id: client.id,
+    timestamp: new Date(event.timestamp).getTime(),
+    endpoint: '/api/images/generate',
+    duration_total_ms: 0,
+    duration_fal_ms: 0,
+    status: 'success',
+    error: null,
+    metadata: {
+      model: event.model,
+      garments_count: 1,
+      cold_start: false,
+      job_id: event.jobId,
+    },
+  };
+
+  await redis.set(`generations:${genId}`, JSON.stringify(metric), { ex: 30 * 24 * 3600 });
+  await redis.zadd(`metrics:${client.id}:generations`, {
+    score: metric.timestamp,
+    member: genId,
+  });
 }
