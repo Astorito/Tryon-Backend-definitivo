@@ -158,3 +158,4 @@ Ver documentación del proyecto principal.
 **Versión**: 1.0.0  
 **Última actualización**: Diciembre 2025
 2 version de TryOn Backend
+# trigger deploy
