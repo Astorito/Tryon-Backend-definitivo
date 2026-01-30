@@ -93,6 +93,22 @@ export default function Home() {
         >
           Ver Demo →
         </a>
+        <a 
+          href="/admin"
+          style={{
+            display: 'inline-block',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            color: 'white',
+            padding: '16px 32px',
+            borderRadius: '12px',
+            fontSize: '18px',
+            fontWeight: '600',
+            textDecoration: 'none',
+            marginLeft: '16px',
+          }}
+        >
+          Admin Panel 🔐
+        </a>
       </div>
     </div>
   );
