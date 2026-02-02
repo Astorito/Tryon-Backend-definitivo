@@ -1,4 +1,5 @@
 import { getRedis } from './redis';
+import { getClientByApiKey } from './auth';
 
 /**
  * Almacenamiento de métricas en memoria
@@ -237,5 +238,90 @@ export async function recordEvent(clientKey: string, event: {
   await redis.zadd(`metrics:${client.id}:generations`, {
     score: metric.timestamp,
     member: genId,
+  });
+}
+
+/**
+ * Obtiene métricas de series de tiempo para gráficos
+ */
+export function getTimeSeriesData(clientKeys: string[], months: number = 6): any[] {
+  const now = new Date();
+  const monthsAgo = new Date(now.getFullYear(), now.getMonth() - months, 1);
+  const result: any[] = [];
+
+  // Generar estructura de meses
+  for (let i = 0; i < months; i++) {
+    const date = new Date(monthsAgo.getFullYear(), monthsAgo.getMonth() + i, 1);
+    const monthKey = date.toLocaleDateString('es', { month: 'short' });
+    
+    const dataPoint: any = { month: monthKey };
+    
+    for (const clientKey of clientKeys) {
+      const events = metricsStore.get(clientKey) || [];
+      const monthEvents = events.filter(e => {
+        const eventDate = new Date(e.timestamp);
+        return eventDate.getMonth() === date.getMonth() && 
+               eventDate.getFullYear() === date.getFullYear();
+      });
+      dataPoint[clientKey] = monthEvents.length;
+    }
+    
+    result.push(dataPoint);
+  }
+
+  return result;
+}
+
+/**
+ * Obtiene distribución por hora del día
+ */
+export function getHourlyDistribution(clientKeys: string[]): any[] {
+  const hourCounts: Record<number, number> = {};
+  
+  for (let i = 0; i < 24; i++) {
+    hourCounts[i] = 0;
+  }
+
+  for (const clientKey of clientKeys) {
+    const events = metricsStore.get(clientKey) || [];
+    for (const event of events) {
+      const hour = new Date(event.timestamp).getHours();
+      hourCounts[hour]++;
+    }
+  }
+
+  return Object.entries(hourCounts).map(([hour, count]) => ({
+    hour: `${hour.padStart(2, '0')}:00`,
+    count,
+  }));
+}
+
+/**
+ * Obtiene ranking de empresas por generaciones
+ */
+export function getRanking(): any[] {
+  const allMetrics = getAllMetrics();
+  const total = allMetrics.totals.totalGenerations;
+
+  return allMetrics.clients
+    .map(client => ({
+      name: client.clientName,
+      count: client.totalGenerations,
+      percentage: total > 0 ? (client.totalGenerations / total) * 100 : 0,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+}
+
+/**
+ * Obtiene distribución de generaciones por empresa
+ */
+export function getDistribution(clientKeys: string[]): any[] {
+  return clientKeys.map(clientKey => {
+    const metrics = getClientMetrics(clientKey);
+    return {
+      name: metrics?.clientName || clientKey,
+      value: metrics?.totalGenerations || 0,
+    };
   });
 }
