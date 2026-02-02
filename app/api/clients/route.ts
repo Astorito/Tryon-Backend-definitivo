@@ -36,15 +36,20 @@ export async function GET(request: NextRequest) {
   const clients = getRegisteredClients().map(client => {
     const metrics = getClientMetrics(client.clientKey);
     return {
-      ...client,
-      totalGenerations: metrics?.totalGenerations || 0,
+      id: client.clientKey,
+      name: client.name,
+      email: null, // Por ahora no guardamos email en el store
+      api_key: client.clientKey, // El clientKey es el API key
+      created_at: client.createdAt,
+      usage_count: metrics?.totalGenerations || 0,
+      limit: 5000,
       lastGeneration: metrics?.lastGeneration || null,
     };
   });
 
   return NextResponse.json({
     success: true,
-    data: clients,
+    clients: clients, // Cambiar 'data' por 'clients' que es lo que espera el frontend
   });
 }
 
@@ -60,29 +65,34 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    if (!body.clientKey || !body.name) {
+    if (!body.name) {
       return NextResponse.json(
-        { error: 'Missing required fields: clientKey, name' },
+        { error: 'Missing required field: name' },
         { status: 400 }
       );
     }
 
-    // Validar formato de clientKey (alfanumérico, sin espacios)
-    if (!/^[a-zA-Z0-9_-]+$/.test(body.clientKey)) {
-      return NextResponse.json(
-        { error: 'clientKey must be alphanumeric (letters, numbers, underscores, hyphens only)' },
-        { status: 400 }
-      );
-    }
+    // Generar clientKey automáticamente (prefijo + timestamp + random)
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substr(2, 5);
+    const clientKey = `tryon_${timestamp}_${random}`;
 
-    registerClient(body.clientKey, body.name);
+    // El clientKey generado es también el API key para el widget
+    const apiKey = clientKey;
+
+    registerClient(clientKey, body.name);
 
     return NextResponse.json({
       success: true,
       message: 'Client registered',
-      data: {
-        clientKey: body.clientKey,
+      client: {
+        id: clientKey,
         name: body.name,
+        email: body.email || null,
+        api_key: apiKey,
+        created_at: new Date().toISOString(),
+        usage_count: 0,
+        limit: 5000,
       },
     });
 
