@@ -855,7 +855,7 @@
     });
     const data = await res.json();
     if (!data.success) {
-      console.error('[TryOn] Upload failed'); throw new Error('No se pudo subir la imagen. Verifica tu conexión.');
+      throw new Error('Upload failed');
     }
     console.log('[TryOn] Pre-uploaded to FAL:', data.url);
     return data.url;
@@ -1659,7 +1659,7 @@
     });
     const data = await res.json();
     if (!data.success) {
-      console.error('[TryOn] Upload failed'); throw new Error('No se pudo subir la imagen. Verifica tu conexión.');
+      throw new Error('Upload failed');
     }
     console.log('[TryOn] Pre-uploaded to FAL:', data.url);
     return data.url;
@@ -2463,7 +2463,7 @@
     });
     const data = await res.json();
     if (!data.success) {
-      console.error('[TryOn] Upload failed'); throw new Error('No se pudo subir la imagen. Verifica tu conexión.');
+      throw new Error('Upload failed');
     }
     console.log('[TryOn] Pre-uploaded to FAL:', data.url);
     return data.url;

@@ -18,7 +18,10 @@ const ADMIN_KEY = process.env.ADMIN_KEY || 'admin_secret_key_2024';
 
 function validateAdmin(request: NextRequest): boolean {
   const adminKey = request.headers.get('x-admin-key');
-  return adminKey === ADMIN_KEY;
+  const authCookie = request.cookies.get('admin_auth');
+  
+  // Permitir acceso con admin key o con cookie de sesión
+  return adminKey === ADMIN_KEY || authCookie?.value === 'authenticated';
 }
 
 // GET: Listar todos los clientes

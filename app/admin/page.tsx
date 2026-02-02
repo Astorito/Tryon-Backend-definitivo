@@ -1,5 +1,5 @@
-import MetricsDashboard from '@/components/MetricsDashboard';
+import { redirect } from 'next/navigation';
 
 export default function AdminPage() {
-  return <MetricsDashboard />;
+  redirect('/dashboard');
 }

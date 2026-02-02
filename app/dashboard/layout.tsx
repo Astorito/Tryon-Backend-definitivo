@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function DashboardLayout({
@@ -9,6 +9,13 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function handleLogout() {
+    await fetch('/api/auth/login', { method: 'DELETE' });
+    router.push('/login');
+    router.refresh();
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -19,7 +26,7 @@ export default function DashboardLayout({
             Panel de Administración - IA Imágenes
           </h1>
           
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             <Link
               href="/dashboard"
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
@@ -42,6 +49,12 @@ export default function DashboardLayout({
               <span className="mr-2">📈</span>
               Analíticas
             </Link>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-red-100 text-red-700 rounded-lg font-medium hover:bg-red-200 transition-colors"
+            >
+              🚪 Salir
+            </button>
           </div>
         </div>
       </header>

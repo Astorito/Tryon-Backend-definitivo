@@ -16,9 +16,10 @@ export async function GET(request: NextRequest) {
   try {
     const adminKey = request.headers.get('x-admin-key');
     const clientKey = request.headers.get('x-client-key');
+    const authCookie = request.cookies.get('admin_auth');
 
-    // Si tiene admin key, retornar todas las métricas
-    if (adminKey === ADMIN_KEY) {
+    // Si tiene admin key o cookie de sesión, retornar todas las métricas
+    if (adminKey === ADMIN_KEY || authCookie?.value === 'authenticated') {
       const metrics = getAllMetrics();
       return NextResponse.json({
         success: true,

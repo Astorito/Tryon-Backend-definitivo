@@ -4,51 +4,59 @@ import type { NextRequest } from 'next/server';
 // Rutas protegidas que requieren autenticación
 const protectedRoutes = ['/dashboard', '/admin'];
 
+// CORS headers para permitir requests desde cualquier origen
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-client-key, x-admin-key',
+  'Access-Control-Max-Age': '86400',
+};
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Manejar preflight requests (OPTIONS) para todas las rutas API
+  if (request.method === 'OPTIONS' && pathname.startsWith('/api/')) {
+    return new NextResponse(null, {
+      status: 204,
+      headers: CORS_HEADERS,
+    });
+  }
+
+  // Agregar CORS headers a todas las responses de API
+  if (pathname.startsWith('/api/')) {
+    const response = NextResponse.next();
+    Object.entries(CORS_HEADERS).forEach(([key, value]) => {
+      response.headers.set(key, value);
+    });
+    return response;
+  }
+
+  // No aplicar autenticación a la ruta de login
+  if (pathname === '/login') {
+    return NextResponse.next();
+  }
 
   // Verificar si la ruta está protegida
   const isProtected = protectedRoutes.some(route => pathname.startsWith(route));
   
   if (isProtected) {
-    // Verificar autenticación básica
-    const authHeader = request.headers.get('authorization');
+    // Verificar cookie de sesión primero
+    const authCookie = request.cookies.get('admin_auth');
     
-    if (!authHeader || !authHeader.startsWith('Basic ')) {
-      return new NextResponse('Authentication required', {
-        status: 401,
-        headers: {
-          'WWW-Authenticate': 'Basic realm="Dashboard Access"',
-        },
-      });
+    if (authCookie?.value === 'authenticated') {
+      return NextResponse.next();
     }
 
-    try {
-      // Decodificar credenciales
-      const base64Credentials = authHeader.split(' ')[1];
-      const credentials = Buffer.from(base64Credentials, 'base64').toString('ascii');
-      const [username, password] = credentials.split(':');
-
-      // Validar credenciales
-      const validUsername = process.env.ADMIN_USERNAME || 'admin';
-      const validPassword = process.env.ADMIN_PASSWORD || 'tryon_admin_2024';
-
-      if (username !== validUsername || password !== validPassword) {
-        return new NextResponse('Invalid credentials', {
-          status: 401,
-          headers: {
-            'WWW-Authenticate': 'Basic realm="Dashboard Access"',
-          },
-        });
-      }
-    } catch (error) {
-      return new NextResponse('Invalid authorization header', { status: 400 });
-    }
+    // Si no hay cookie válida, redirigir a login
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/admin/:path*'],
+  matcher: ['/dashboard/:path*', '/admin/:path*', '/api/:path*'],
 };
