@@ -24,8 +24,8 @@ fal.config({
   credentials: process.env.FAL_KEY || process.env.FAL_API_KEY || '',
 });
 
-// Modelo virtual try-on que definitivamente funciona
-const FAL_MODEL = 'fal-ai/idm-vton';
+// Modelo Nano Banana Edit - optimizado para velocidad
+const FAL_MODEL = 'fal-ai/nano-banana-pro/edit';
 
 export interface FalTryOnRequest {
   userImage: string; // base64 o URL
@@ -98,15 +98,40 @@ export async function generateWithFal(
       throw new Error('Se requiere al menos una prenda');
     }
 
-    console.log('[FAL] Processing', validGarments.length, 'garment(s) with IDM-VTON', `[reqId=${reqId}]`);
+    console.log('[FAL] Processing', validGarments.length, 'garment(s) with Nano Banana Pro Edit', `[reqId=${reqId}]`);
 
-    // IDM-VTON requiere formato específico: person_image y garment_image
+    // Preparar imágenes: persona primero, luego prendas (acepta base64 o URL)
     const personImage = request.userImage;
-    const garmentImage = validGarments[0]; // IDM-VTON maneja solo 1 prenda
+    const garmentImages = validGarments;
+    const allImageUrls = [personImage, ...garmentImages];
     
-    console.log(`[FAL] Calling ${FAL_MODEL}`);
-    console.log(`[FAL] Person image type:`, personImage.startsWith('data:') ? 'base64' : 'url');
-    console.log(`[FAL] Garment image type:`, garmentImage.startsWith('data:') ? 'base64' : 'url');
+    // Construir prompt dinámico para virtual try-on
+    const garmentDescriptions = garmentImages.map((_, i) => `Figure ${i + 2}`).join(' and ');
+    const prompt = validGarments.length === 1
+      ? `Add the clothing garment from Figure 2 onto the person in Figure 1. DO NOT MODIFY the structure, shape, pose, face, or proportions of the original image. KEEP THE ORIGINAL IMAGE EXACTLY AS IT IS, only incorporating the clothing garment onto the person.`
+      : `Add the clothing garments from ${garmentDescriptions} onto the person in Figure 1. DO NOT MODIFY the structure, shape, pose, face, or proportions of the original image. KEEP THE ORIGINAL IMAGE EXACTLY AS IT IS, only incorporating the clothing garments onto the person.`;
+    
+    console.log(`[FAL] Calling ${FAL_MODEL} with prompt:`, prompt.substring(0, 100));
+    console.log(`[FAL] Image URLs count:`, allImageUrls.length);
+    
+    // Validar formato de imágenes
+    for (let i = 0; i < allImageUrls.length; i++) {
+      const img = allImageUrls[i];
+      const isBase64 = img.startsWith('data:');
+      const isUrl = img.startsWith('http');
+      const sizeKB = Math.round(img.length / 1024);
+      
+      console.log(`[FAL] Image ${i + 1}: ${isBase64 ? 'base64' : isUrl ? 'url' : 'unknown'} (${sizeKB} KB)`);
+      
+      if (!isBase64 && !isUrl) {
+        throw new Error(`Invalid image format at position ${i + 1}. Must be base64 or URL.`);
+      }
+      
+      // FAL tiene límite de ~4MB por imagen
+      if (sizeKB > 4000) {
+        console.warn(`[FAL] Warning: Image ${i + 1} is ${sizeKB} KB, might be too large for FAL`);
+      }
+    }
     
     // === TIMING: Fin de pre-procesamiento ===
     const preProcessingEnd = performance.now();
@@ -118,8 +143,8 @@ export async function generateWithFal(
     try {
       result = await fal.subscribe(FAL_MODEL, {
         input: {
-          person_image_url: personImage,
-          garment_image_url: garmentImage,
+          prompt,
+          image_urls: allImageUrls, // Puede ser base64 o URLs
         },
       });
     } catch (falError: any) {
