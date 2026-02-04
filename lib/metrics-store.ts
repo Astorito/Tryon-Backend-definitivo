@@ -58,6 +58,12 @@ export function recordEventInMemory(clientKey: string, event: Omit<MetricEvent, 
   const events = metricsStore.get(clientKey)!;
   events.push(fullEvent);
 
+  console.log(`[Metrics] Event recorded for ${clientKey}:`, {
+    totalEvents: events.length,
+    eventType: fullEvent.type,
+    clientName: fullEvent.clientName,
+  });
+
   // Mantener solo los últimos 1000 eventos por cliente
   if (events.length > 1000) {
     events.shift();

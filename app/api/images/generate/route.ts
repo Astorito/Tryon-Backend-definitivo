@@ -183,6 +183,7 @@ export async function POST(request: NextRequest) {
 
 
     // Record metrics (non-blocking)
+    console.log(`[Generate] Recording metrics for client: ${body.apiKey}`);
     recordEvent(body.apiKey, {
       type: 'generation',
       timestamp: new Date().toISOString(),

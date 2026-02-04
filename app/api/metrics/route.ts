@@ -24,6 +24,8 @@ export async function GET(request: NextRequest) {
 
     // Si tiene admin key o cookie de sesión
     if (adminKey === ADMIN_KEY || authCookie?.value === 'authenticated') {
+      console.log('[Metrics API] Admin authenticated, fetching metrics...');
+      
       // Si se especifica un client_id, retornar solo sus métricas
       if (clientId) {
         const metrics = getClientMetrics(clientId);
@@ -43,6 +45,12 @@ export async function GET(request: NextRequest) {
       
       // Si no se especifica client_id, retornar todas las métricas
       const allMetrics = getAllMetrics();
+      console.log('[Metrics API] Returning all metrics:', {
+        totalClients: allMetrics.totals.totalClients,
+        totalGenerations: allMetrics.totals.totalGenerations,
+        clients: allMetrics.clients.map(c => ({ key: c.clientKey, gens: c.totalGenerations }))
+      });
+      
       return NextResponse.json({
         success: true,
         metrics: allMetrics,
