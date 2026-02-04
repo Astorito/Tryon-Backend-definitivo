@@ -176,14 +176,14 @@ export async function generateWithFal(
 
     console.log('[FAL] Raw response:', JSON.stringify(result.data, null, 2));
 
-    const data = result.data as { image?: { url: string } };
+    const data = result.data as { images?: Array<{ url: string }> };
     
-    if (!data.image?.url) {
+    if (!data.images?.[0]?.url) {
       console.error('[FAL] No image in response:', data);
-      throw new Error('Error generando imagen con IDM-VTON - no image returned');
+      throw new Error('Error generando imagen con Nano Banana - no image returned');
     }
 
-    const resultImage = data.image.url;
+    const resultImage = data.images[0].url;
     
     // === TIMING: Post-procesamiento ===
     const postProcessingStart = performance.now();
