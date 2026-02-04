@@ -1,15 +1,20 @@
 import { getRedis } from './redis';
 import { getClientByApiKey } from './auth';
+import { writeFileSync, readFileSync, existsSync } from 'fs';
+import { join } from 'path';
 
 /**
- * Almacenamiento de métricas en memoria
+ * Almacenamiento de métricas en memoria con persistencia local
  * 
  * En producción esto debería usar una base de datos como:
  * - Redis para datos volátiles
  * - PostgreSQL/MongoDB para persistencia
  * 
- * Por ahora usamos memoria con persistencia opcional a archivo.
+ * En desarrollo: persiste en archivo JSON local.
  */
+
+// Path para persistencia en desarrollo
+const METRICS_FILE = join(process.cwd(), 'temp', 'metrics.json');
 
 export interface MetricEvent {
   id: string;
@@ -31,8 +36,43 @@ export interface ClientMetrics {
   recentEvents: MetricEvent[];
 }
 
-// Almacenamiento en memoria
+// Almacenamiento en memoria con persistencia
 const metricsStore: Map<string, MetricEvent[]> = new Map();
+
+// Funciones de persistencia para desarrollo
+function saveMetricsToFile() {
+  try {
+    const data = Object.fromEntries(metricsStore.entries());
+    const dir = join(process.cwd(), 'temp');
+    
+    // Crear directorio si no existe
+    if (!existsSync(dir)) {
+      require('fs').mkdirSync(dir, { recursive: true });
+    }
+    
+    writeFileSync(METRICS_FILE, JSON.stringify(data, null, 2));
+    console.log('[MetricsStore] Saved to file:', Object.keys(data).length, 'clients');
+  } catch (error) {
+    console.error('[MetricsStore] Error saving:', error);
+  }
+}
+
+function loadMetricsFromFile() {
+  try {
+    if (existsSync(METRICS_FILE)) {
+      const data = JSON.parse(readFileSync(METRICS_FILE, 'utf-8'));
+      for (const [key, events] of Object.entries(data)) {
+        metricsStore.set(key, events as MetricEvent[]);
+      }
+      console.log('[MetricsStore] Loaded from file:', Object.keys(data).length, 'clients');
+    }
+  } catch (error) {
+    console.error('[MetricsStore] Error loading:', error);
+  }
+}
+
+// Cargar métricas al iniciar
+loadMetricsFromFile();
 
 // Configuración de empresas registradas
 const registeredClients: Map<string, { name: string; createdAt: string }> = new Map([
@@ -64,6 +104,10 @@ export function recordEventInMemory(clientKey: string, event: Omit<MetricEvent, 
     clientName: fullEvent.clientName,
   });
 
+  // Persistir en archivo para desarrollo
+  saveMetricsToFile();
+}
+
   // Mantener solo los últimos 1000 eventos por cliente
   if (events.length > 1000) {
     events.shift();
@@ -78,6 +122,13 @@ export function recordEventInMemory(clientKey: string, event: Omit<MetricEvent, 
 export function getClientMetrics(clientKey: string): ClientMetrics | null {
   const events = metricsStore.get(clientKey);
   const clientInfo = registeredClients.get(clientKey);
+
+  // Debug: log current state
+  console.log(`[Debug] getClientMetrics for ${clientKey}:`, {
+    hasEvents: !!events,
+    eventCount: events?.length || 0,
+    hasClientInfo: !!clientInfo,
+  });
 
   if (!events && !clientInfo) {
     return null;
@@ -97,7 +148,7 @@ export function getClientMetrics(clientKey: string): ClientMetrics | null {
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
 
-  return {
+  const result = {
     clientKey,
     clientId: clientEvents[0]?.clientId || clientKey,
     clientName: clientInfo?.name || clientEvents[0]?.clientName || 'Unknown',
@@ -106,6 +157,13 @@ export function getClientMetrics(clientKey: string): ClientMetrics | null {
     generationsByModel,
     recentEvents: sortedEvents.slice(0, 50), // Últimos 50 eventos
   };
+
+  console.log(`[Debug] Returning metrics for ${clientKey}:`, {
+    totalGenerations: result.totalGenerations,
+    clientName: result.clientName,
+  });
+
+  return result;
 }
 
 /**
