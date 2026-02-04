@@ -4,6 +4,10 @@ import { generateWithFal } from '@/lib/fal-client';
 import { recordEvent } from '@/lib/metrics-store';
 import { createTimingContext, elapsed, logLatency } from '@/lib/latency';
 
+// Configuración de runtime para evitar timeouts
+export const maxDuration = 60; // 60 segundos máximo
+export const dynamic = 'force-dynamic';
+
 /**
  * Endpoint de generación de imágenes
  * POST /api/images/generate

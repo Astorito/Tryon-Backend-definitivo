@@ -10,6 +10,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-client-key, x-admin-key',
   'Access-Control-Max-Age': '86400',
+  'Content-Security-Policy': "default-src 'self' 'unsafe-inline' 'unsafe-eval' *; img-src * data: blob:; font-src * data:; style-src * 'unsafe-inline'; connect-src *",
 };
 
 export function middleware(request: NextRequest) {

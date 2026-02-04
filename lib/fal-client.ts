@@ -98,7 +98,7 @@ export async function generateWithFal(
       throw new Error('Se requiere al menos una prenda');
     }
 
-    console.log('[FAL] Processing', validGarments.length, 'garment(s) with SeedDream v4.5 Edit', `[reqId=${reqId}]`);
+    console.log('[FAL] Processing', validGarments.length, 'garment(s) with Nano Banana Edit', `[reqId=${reqId}]`);
 
     // Preparar imágenes: persona primero, luego prendas (acepta base64 o URL)
     const personImage = request.userImage;
@@ -152,7 +152,7 @@ export async function generateWithFal(
     const data = result.data as { images?: Array<{ url: string }> };
     
     if (!data.images?.[0]?.url) {
-      throw new Error('Error generando imagen con SeedDream');
+      throw new Error('Error generando imagen con Nano Banana');
     }
 
     const resultImage = data.images[0].url;

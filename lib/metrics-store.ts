@@ -216,6 +216,15 @@ export async function recordEvent(clientKey: string, event: {
     return;
   }
 
+  // Guardar en memoria para el dashboard
+  recordEventInMemory(clientKey, {
+    type: 'generation',
+    timestamp: event.timestamp,
+    model: event.model,
+    clientId: client.id,
+    clientName: client.name,
+  });
+
   const genId = `gen_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
   const metric: GenerationMetric = {
     id: genId,

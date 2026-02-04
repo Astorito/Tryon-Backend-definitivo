@@ -17,13 +17,35 @@ export async function GET(request: NextRequest) {
     const adminKey = request.headers.get('x-admin-key');
     const clientKey = request.headers.get('x-client-key');
     const authCookie = request.cookies.get('admin_auth');
+    
+    // Obtener client_id del query string
+    const { searchParams } = new URL(request.url);
+    const clientId = searchParams.get('client_id');
 
-    // Si tiene admin key o cookie de sesión, retornar todas las métricas
+    // Si tiene admin key o cookie de sesión
     if (adminKey === ADMIN_KEY || authCookie?.value === 'authenticated') {
-      const metrics = getAllMetrics();
+      // Si se especifica un client_id, retornar solo sus métricas
+      if (clientId) {
+        const metrics = getClientMetrics(clientId);
+        
+        if (!metrics) {
+          return NextResponse.json(
+            { error: 'Client not found' },
+            { status: 404 }
+          );
+        }
+
+        return NextResponse.json({
+          success: true,
+          metrics: metrics,
+        });
+      }
+      
+      // Si no se especifica client_id, retornar todas las métricas
+      const allMetrics = getAllMetrics();
       return NextResponse.json({
         success: true,
-        data: metrics,
+        metrics: allMetrics,
       });
     }
 
@@ -40,7 +62,7 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        data: metrics,
+        metrics: metrics,
       });
     }
 
