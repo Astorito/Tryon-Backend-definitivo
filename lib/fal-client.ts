@@ -117,12 +117,26 @@ export async function generateWithFal(
     // === TIMING: Inicio llamada FAL ===
     const falStart = performance.now();
     
-    const result = await fal.subscribe(FAL_MODEL, {
-      input: {
-        prompt,
-        image_urls: allImageUrls, // Puede ser base64 o URLs
-      },
-    });
+    console.log(`[FAL] Calling ${FAL_MODEL} with prompt:`, prompt.substring(0, 100));
+    console.log(`[FAL] Image URLs count:`, allImageUrls.length);
+    
+    let result;
+    try {
+      result = await fal.subscribe(FAL_MODEL, {
+        input: {
+          prompt,
+          image_urls: allImageUrls, // Puede ser base64 o URLs
+        },
+      });
+    } catch (falError: any) {
+      console.error('[FAL] Error calling FAL API:', {
+        message: falError.message,
+        status: falError.status,
+        body: falError.body,
+        stack: falError.stack?.substring(0, 200),
+      });
+      throw new Error(`FAL API error: ${falError.message || 'Unknown error'}`);
+    }
     
     // === TIMING: Fin llamada FAL ===
     const falEnd = performance.now();
@@ -180,7 +194,12 @@ export async function generateWithFal(
     };
 
   } catch (error) {
-    console.error('[FAL] Error:', error, `[reqId=${reqId}]`);
+    console.error('[FAL] Error details:', {
+      error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      requestId: reqId,
+    });
     
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
     

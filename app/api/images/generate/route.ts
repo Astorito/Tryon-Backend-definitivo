@@ -155,10 +155,38 @@ export async function POST(request: NextRequest) {
     });
 
     // Llamar a FAL AI - Virtual Try-On
-    const result = await generateWithFal({
-      userImage: userInput,
-      garments: garmentInputs,
-    }, correlationId);
+    let result;
+    try {
+      console.log(`[Generate] Calling FAL for client: ${body.apiKey}`);
+      result = await generateWithFal({
+        userImage: userInput,
+        garments: garmentInputs,
+      }, correlationId);
+      console.log(`[Generate] FAL response received, success: ${result.success}`);
+    } catch (falError: any) {
+      console.error(`[Generate] FAL call failed:`, {
+        error: falError.message,
+        stack: falError.stack?.substring(0, 300),
+      });
+      
+      // Registrar métrica de error
+      recordEvent(body.apiKey, {
+        type: 'generation',
+        timestamp: new Date().toISOString(),
+        model: 'fal-virtual-try-on-error',
+        clientId: client.id,
+        clientName: client.name,
+      }).catch(err => console.error('[Generate] Metrics error:', err));
+      
+      return NextResponse.json(
+        { 
+          success: false,
+          error: `Generation failed: ${falError.message}`,
+          details: 'FAL API error - please try again'
+        },
+        { status: 500 }
+      );
+    }
     
     const falEndTs = Date.now();
     
@@ -174,16 +202,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (!result.success) {
-      return NextResponse.json(
-        { error: result.error || 'Generation failed' },
-        { status: 500 }
-      );
-    }
-
-
-    // Record metrics (non-blocking)
-    console.log(`[Generate] Recording metrics for client: ${body.apiKey}`);
+    // Record metrics (non-blocking) - registrar SIEMPRE, incluso en caso de error
+    console.log(`[Generate] Recording metrics for client: ${body.apiKey}, success: ${result.success}`);
     recordEvent(body.apiKey, {
       type: 'generation',
       timestamp: new Date().toISOString(),
@@ -193,6 +213,13 @@ export async function POST(request: NextRequest) {
     }).catch(err => {
       console.error('[Generate] Metrics error:', err);
     });
+
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.error || 'Generation failed' },
+        { status: 500 }
+      );
+    }
 
     // Preparar response
     const responseSentTs = Date.now();
